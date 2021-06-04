@@ -1,6 +1,6 @@
 import os
 
-from src.DatasetBuilder import DEFAULT_DATASET_SIZES
+from src.constants import DEFAULT_DATASET_SIZES
 from src.Evaluation import EvaluationScores
 
 EVALUATION_DATABASE_PATH = os.path.join("EVALUATIONS", "Evaluation_results.csv")

@@ -7,7 +7,6 @@ import os
 import torch.multiprocessing as mp
 from portalocker import Lock
 import time
-import configparser
 
 from DBModelRecording import EVALUATION_DATABASE_PATH, create_archive_evaluation_entry
 from src.Models import EmbeddingAndMaxMPNN, EncodeProcessDecodeAlgorithm, GatedGCNEmbedAndProcess
@@ -16,15 +15,7 @@ from src.Trainers import SupervisedTrainFollowingHamiltonCycle,\
     REINFORCE_WithLearnableBaseline, plot_history
 from src.Development_code.ExperimentalTrainers import NeighborMaskedSupervisedTrainFollowingHamiltonCycle, REINFOCE_With_Averaged_simulations
 from src.GraphGenerators import ErdosRenyiGenerator, NoisyCycleBatchGenerator
-from src.ExactSolvers import CONFIG_FILE_PATH
-
-config = configparser.ConfigParser()
-config.read(CONFIG_FILE_PATH)
-WEIGHTS_BACKUP_PATH = config["DATABASE"]["WEIGHTS_BACKUP_PATH"]
-EVALUATION_DATABASE_LOCK_PATH = config["DATABASE"]["EVALUATION_DATABASE_LOCK_PATH"]
-
-# WEIGHTS_BACKUP_PATH = config["DATABASE"]["WEIGHTS_BACKUP_PATH"]
-# EVALUATION_DATABASE_LOCK_PATH = os.path.join(os.path.dirname(EVALUATION_DATABASE_PATH), "Evaluation_results.parallel_lock")
+from src.constants import EVALUATION_DATABASE_LOCK_PATH
 
 
 class HamiltonModelLogRequest(ABC):
@@ -232,9 +223,6 @@ if __name__ == '__main__':
     torch.autograd.set_detect_anomaly(True)
 
     NR_THREADS = 4
-    import socket
-    if socket.gethostname() == "godot":
-        NR_THREADS = 32
     torch.set_num_threads(NR_THREADS)
     print(f"Working on max {NR_THREADS} parallel threads")
 
