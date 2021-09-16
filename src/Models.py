@@ -115,41 +115,42 @@ class HamiltonianCycleFinder(ABC):
         return p, choice
 
     def batch_run_greedy_neighbor(self, d: torch_g.data.Batch):
-        self.init_graph(d)
+        with torch.no_grad():
+            self.init_graph(d)
 
-        self.prepare_for_first_step(d, None)
-        p, choice = self._neighbor_prob_and_greedy_choice_for_batch(d)
-        selections = torch.unsqueeze(p, dim=-2)
-        walk = torch.unsqueeze(choice, dim=-1)
-        nodes_per_graph = d.num_nodes // d.num_graphs
-
-        stop_algorithm_mask = torch.zeros_like(choice, dtype=torch.uint8)
-        for step in range(1, nodes_per_graph + 1):
-            if step == 1:
-                self.prepare_for_first_step(d, choice)
-            else:
-                current_nodes = walk[..., step - 1]
-                self.update_state(d, current_nodes[current_nodes != -1])
+            self.prepare_for_first_step(d, None)
             p, choice = self._neighbor_prob_and_greedy_choice_for_batch(d)
-            choice = torch.logical_not(stop_algorithm_mask) * choice \
-                     - stop_algorithm_mask * torch.ones_like(choice)
-            stop_algorithm_mask = torch.maximum(stop_algorithm_mask,
-                                                torch.any(torch.eq(walk, choice[..., None]), dim=-1))
+            selections = torch.unsqueeze(p, dim=-2)
+            walk = torch.unsqueeze(choice, dim=-1)
+            nodes_per_graph = d.num_nodes // d.num_graphs
 
-            walk = torch.cat([walk, choice.unsqueeze(dim=-1)], dim=-1)
-            selections = torch.cat(
-                [selections, torch.unsqueeze(p * torch.logical_not(stop_algorithm_mask)[..., None]
-                                             - stop_algorithm_mask[..., None], dim=-2)], dim=-2)
+            stop_algorithm_mask = torch.zeros_like(choice, dtype=torch.uint8)
+            for step in range(1, nodes_per_graph + 1):
+                if step == 1:
+                    self.prepare_for_first_step(d, choice)
+                else:
+                    current_nodes = walk[..., step - 1]
+                    self.update_state(d, current_nodes[current_nodes != -1])
+                p, choice = self._neighbor_prob_and_greedy_choice_for_batch(d)
+                choice = torch.logical_not(stop_algorithm_mask) * choice \
+                         - stop_algorithm_mask * torch.ones_like(choice)
+                stop_algorithm_mask = torch.maximum(stop_algorithm_mask,
+                                                    torch.any(torch.eq(walk, choice[..., None]), dim=-1))
 
-            if torch.all(stop_algorithm_mask).item():
-                walk = torch.cat([walk, -1 * torch.ones([walk.shape[0], nodes_per_graph - step], dtype=walk.dtype,
-                                                        device=walk.device)], dim=-1)
+                walk = torch.cat([walk, choice.unsqueeze(dim=-1)], dim=-1)
                 selections = torch.cat(
-                    [selections, -1 * torch.ones(selections.shape[0], nodes_per_graph - step, selections.shape[2])],
-                    dim=-2)
-                break
+                    [selections, torch.unsqueeze(p * torch.logical_not(stop_algorithm_mask)[..., None]
+                                                 - stop_algorithm_mask[..., None], dim=-2)], dim=-2)
 
-        return walk, selections
+                if torch.all(stop_algorithm_mask).item():
+                    walk = torch.cat([walk, -1 * torch.ones([walk.shape[0], nodes_per_graph - step], dtype=walk.dtype,
+                                                            device=walk.device)], dim=-1)
+                    selections = torch.cat(
+                        [selections, -1 * torch.ones(selections.shape[0], nodes_per_graph - step, selections.shape[2])],
+                        dim=-2)
+                    break
+
+            return walk, selections
 
 
 class HamiltonCycleFinderWithValueFunction(HamiltonianCycleFinder):
