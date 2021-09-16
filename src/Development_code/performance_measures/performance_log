@@ -1,3 +1,12 @@
-On 25, 50, 100, 200
-Original HamS
+########OFFICE PC, CPU#####################
+
+Operation times in s: {'data_init': 0.00025391578674316406, 'data_prep': 7.605552673339844e-05, 'pure_logits': 0.050664663314819336, 'neighbor_logits': 0.0005893707275390625, 'probs_computation': 0.0027265548706054688, 'selection': 0.001210927963256836}
+Fraction of time spent on operation: {'data_init': 0.0045732885594785165, 'data_prep': 0.0013698394840128139, 'pure_logits': 0.9125235105679466, 'neighbor_logits': 0.010615182459183936, 'probs_computation': 0.04910810137671015, 'selection': 0.021810077552667968}
+Single run, 0.019254684448242188, components total 0.055521488189697266
+Concorde solver: [5.497135639190674]
+Repeated generation: 9.627342224121094
+HamS model greedy: [5.7112720012664795]
+
+###########################################
+
 

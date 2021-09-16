@@ -61,25 +61,31 @@ def profile_EPD(model: EncodeProcessDecodeAlgorithm, d):
 
 
 if __name__ == '__main__':
-    HamS_model = EncodeProcessDecodeAlgorithm(True, processor_depth=5, hidden_dim=32)
+    device_name = "cpu"
+
+    HamS_model = EncodeProcessDecodeAlgorithm(True, processor_depth=5, hidden_dim=32, device=device_name)
     s1 = 500
 
     generator = ErdosRenyiGenerator(s1, 0.8)
-    times = profile_EPD(HamS_model, next(iter(generator)))
+    d = next(iter(generator)).to(device_name)
+    times = profile_EPD(HamS_model, d)
     print(f"Operation times in s: {times}")
     total = sum(times.values())
     perc = {k: v/total for k, v in times.items()}
     print(f"Fraction of time spent on operation: {perc}")
 
-    d = next(iter(generator))
+    d = next(iter(generator)).to(device_name)
     d = torch_g.data.Batch.from_data_list([d])
     full, _ = time_operation(lambda a: operation_forward_step(HamS_model, a), [d])
     print(f"Single run, {full}, components total {total}")
 
     sizes = [s1]
-    concorde_solver = ConcordeHamiltonSolver()
-    timings = time_operation_on_ER(lambda d: concorde_solver.solve(d), sizes, nr_examples_per_size=1)
-    print(f"Concorde solver: {timings}")
+    try:
+        concorde_solver = ConcordeHamiltonSolver()
+        timings = time_operation_on_ER(lambda d: concorde_solver.solve(d), sizes, nr_examples_per_size=1)
+        print(f"Concorde solver: {timings}")
+    except:
+        print("Concorde not installed on the system")
     print("Repeated generation:", s1*full)
     timings = time_operation_on_ER(
         lambda d: HamS_model.batch_run_greedy_neighbor(torch_g.data.Batch.from_data_list([d])),
