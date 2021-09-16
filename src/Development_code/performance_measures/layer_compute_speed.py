@@ -29,7 +29,7 @@ def time_operation_on_ER(operation, sizes=None, ham_prob=0.8, nr_examples_per_si
     timings = []
     for s in sizes:
         generator = ErdosRenyiGenerator(s, ham_prob)
-        t, _ = time_operation(operation, itertools.islice(generator, nr_examples_per_size))
+        t, choice = time_operation(operation, itertools.islice(generator, nr_examples_per_size))
         timings.append(t)
     return timings
 
@@ -62,25 +62,26 @@ def profile_EPD(model: EncodeProcessDecodeAlgorithm, d):
 
 if __name__ == '__main__':
     HamS_model = EncodeProcessDecodeAlgorithm(True, processor_depth=5, hidden_dim=32)
-    generator = ErdosRenyiGenerator(10_000, 0.8)
+    s1 = 500
+
+    generator = ErdosRenyiGenerator(s1, 0.8)
     times = profile_EPD(HamS_model, next(iter(generator)))
-    print(times)
+    print(f"Operation times in s: {times}")
     total = sum(times.values())
     perc = {k: v/total for k, v in times.items()}
-    print(perc)
+    print(f"Fraction of time spent on operation: {perc}")
 
     d = next(iter(generator))
     d = torch_g.data.Batch.from_data_list([d])
     full, _ = time_operation(lambda a: operation_forward_step(HamS_model, a), [d])
-    print(full, total)
-    exit(-5)
+    print(f"Single run, {full}, components total {total}")
 
-    sizes = [25, 50, 100, 200]
+    sizes = [s1]
     concorde_solver = ConcordeHamiltonSolver()
-    timings = time_operation_on_ER(lambda d: concorde_solver.solve(d), sizes)
-    print(timings)
-    exit()
+    timings = time_operation_on_ER(lambda d: concorde_solver.solve(d), sizes, nr_examples_per_size=1)
+    print(f"Concorde solver: {timings}")
+    print("Repeated generation:", s1*full)
     timings = time_operation_on_ER(
         lambda d: HamS_model.batch_run_greedy_neighbor(torch_g.data.Batch.from_data_list([d])),
-        sizes=sizes)
-    print(timings)
+        sizes=sizes, nr_examples_per_size=1)
+    print(f"HamS model greedy: {timings}")
