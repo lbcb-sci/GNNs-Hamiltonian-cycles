@@ -2,6 +2,36 @@ import numpy
 import torch_geometric as torch_g
 import torch
 import itertools
+import pandas
+
+
+def _generate_ERmk_model_edge_index_for_small_k(num_nodes, num_edges):
+    assert num_edges < num_nodes * (num_nodes - 1) // 4
+    original_dtype = numpy.int64
+    _generation_overhead = 0.1
+    edge_index = numpy.empty([0, 2], dtype=original_dtype)
+    while edge_index.shape[0] < num_edges:
+        points_to_generate = 2 * (num_edges + int(num_edges * _generation_overhead))
+        generated_edges = numpy.random.randint(0, num_nodes, size=[points_to_generate],
+                                               dtype=original_dtype)
+        symmetrized_edges = numpy.empty(shape=[2*generated_edges.shape[0]], dtype=generated_edges.dtype)
+        symmetrized_edges[0::4] = generated_edges[0::2]
+        symmetrized_edges[1::4] = generated_edges[1::2]
+        symmetrized_edges[2::4] = generated_edges[1::2]
+        symmetrized_edges[3::4] = generated_edges[0::2]
+        symmetrized_edges = symmetrized_edges.view(dtype=numpy.dtype([("x", original_dtype), ("y", original_dtype)]))
+        symmetrized_edges = pandas.unique(symmetrized_edges)
+        symmetrized_edges = symmetrized_edges.view(dtype=original_dtype).reshape([symmetrized_edges.shape[0], 2])
+        symmetrized_edges = symmetrized_edges[symmetrized_edges[:, 0] != symmetrized_edges[:, 1]]
+        new_edges = symmetrized_edges[0::2]
+        edge_index = numpy.concatenate([edge_index, new_edges], axis=0)
+    edge_index = torch.t(torch.from_numpy(edge_index))
+    return edge_index[:, :num_edges]
+
+
+def generate_ERp_model_edge_index_for_small_k(num_nodes, prob):
+    num_edges = numpy.random.binomial(num_nodes * (num_nodes-1) // 2, prob)
+    return _generate_ERmk_model_edge_index_for_small_k(num_nodes, num_edges)
 
 
 class NoisyCycleBatchGenerator:
@@ -12,7 +42,7 @@ class NoisyCycleBatchGenerator:
 
     def _generate_noisy_cycle(self):
         d = torch_g.data.Data()
-        ER_edge_index = torch_g.utils.erdos_renyi_graph(self.num_nodes,
+        ER_edge_index = generate_ERp_model_edge_index_for_small_k(self.num_nodes,
                                                         self.expected_noise_edge_for_node / self.num_nodes)
         artificial_cycle = torch.randperm(self.num_nodes)
         artificial_edges = torch.stack([artificial_cycle, artificial_cycle.roll(-1, 0)], dim=0)
@@ -56,7 +86,7 @@ class ErdosRenyiGenerator:
     def _erdos_renyi_generator(self):
         d = torch_g.data.Data()
         d.num_nodes = self.num_nodes
-        d.edge_index = torch_g.utils.erdos_renyi_graph(d.num_nodes, self.p)
+        d.edge_index = generate_ERp_model_edge_index_for_small_k(d.num_nodes, self.p)
         return d
 
     def output_details(self):
