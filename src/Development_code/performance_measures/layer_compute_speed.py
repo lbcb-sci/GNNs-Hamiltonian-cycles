@@ -8,6 +8,7 @@ import torch_scatter
 from src.DatasetBuilder import ErdosRenyiInMemoryDataset, ErdosRenyiGenerator
 from src.Models import GatedGCNEmbedAndProcess, HamiltonianCycleFinder, EncodeProcessDecodeAlgorithm
 from src.ExactSolvers import ConcordeHamiltonSolver
+from src.NN_modules import ResidualMultilayerMPNN
 
 
 def time_operation(operation, dataset):
@@ -45,7 +46,11 @@ def profile_EPD(model: EncodeProcessDecodeAlgorithm, d):
     d = torch_g.data.Batch.from_data_list([d])
     times["data_init"], _ = time_operation(lambda a: model.init_graph(a), [d])
     times["data_prep"], _ = time_operation(lambda a: model.prepare_for_first_step(a, [0]), [d])
-    times["pure_logits"], l = time_operation(lambda a: model.next_step_logits(d), [d])
+
+    times["encoding"], d.z = time_operation(lambda a: model.encoder_nn(torch.cat([a.x, a.h], dim=-1)), [d])
+    times["processing"], d.h = time_operation(lambda a: model.processor_nn(a.z, a.edge_index, a.edge_attr), [d])
+    times["decoding"], l = time_operation(lambda a: torch.squeeze(model.decoder_nn(torch.cat([a.z, a.h], dim=-1)), dim=-1), [d])
+    # times["pure_logits"], l = time_operation(lambda a: model.next_step_logits(a), [d])
     times["neighbor_logits"], n = time_operation(lambda a: model._mask_neighbor_logits(l, a), [d])
     times["probs_computation"], p = time_operation(lambda a: torch_scatter.scatter_softmax(n, a.batch), [d])
 
@@ -59,12 +64,30 @@ def profile_EPD(model: EncodeProcessDecodeAlgorithm, d):
 
     return times
 
+def profile_ResidualMPNN(net: ResidualMultilayerMPNN, x, edge_index, edge_weight):
+    timings = {}
+    layer_index =0
+    for l in net.layers:
+        # timings[f"layer{layer_index}x1"], x = time_operation(lambda a: l.forward(x, edge_index, edge_weight), [x])
+
+        layer_index += 1
+    print(timings)
+
 
 if __name__ == '__main__':
+    import sys
     device_name = "cpu"
+    s1 = 10_000
+    d = next(iter(ErdosRenyiGenerator(s1, 0.8))).to(device_name)
 
-    HamS_model = EncodeProcessDecodeAlgorithm(True, processor_depth=5, hidden_dim=32, device=device_name)
-    s1 = 500
+    HamS_model = EncodeProcessDecodeAlgorithm(False, processor_depth=2, hidden_dim=32, device=device_name)
+    net = HamS_model.processor_nn
+    with torch.no_grad():
+        HamS_model.init_graph(d)
+        HamS_model.prepare_for_first_step(d, 0)
+        x = HamS_model.encoder_nn.forward(torch.cat([d.x, d.h], dim=-1))
+        edge_index, edge_weight = d.edge_index, d.edge_attr
+        profile_ResidualMPNN(net, x, edge_index, edge_weight)
 
     generator = ErdosRenyiGenerator(s1, 0.8)
     d = next(iter(generator)).to(device_name)
@@ -87,7 +110,11 @@ if __name__ == '__main__':
     except:
         print("Concorde not installed on the system")
     print("Repeated generation:", s1*full)
-    timings = time_operation_on_ER(
-        lambda d: HamS_model.batch_run_greedy_neighbor(torch_g.data.Batch.from_data_list([d])),
-        sizes=sizes, nr_examples_per_size=1)
+
+    timings, _ = time_operation(
+        lambda a: HamS_model.batch_run_greedy_neighbor(a), [d])
     print(f"HamS model greedy: {timings}")
+
+    for i in range(3):
+        timings, _ = time_operation(lambda a: HamS_model.next_step_prob_masked_over_neighbors(a), [d])
+        print(f"Rerun {i}: {timings}")
