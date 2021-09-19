@@ -10,4 +10,7 @@ HamS model greedy: [5.7112720012664795]
 Processor residual net
 {'layer0': 0.04023480415344238, 'layer1': 0.002712249755859375, 'layer2': 0.002282857894897461, 'layer3': 0.0023109912872314453, 'layer4': 0.0023903846740722656}
 
-
+###########################################
+Testing on laptop, CPU vs GPU for GNN layer (note cuda initialization in first layer)
+cpu: {'layer0x1': 0.15359091758728027, 'layer1x1': 0.049865007400512695}
+gpu: {'layer0x1': 0.49494266510009766, 'layer1x1': 0.000997304916381836}

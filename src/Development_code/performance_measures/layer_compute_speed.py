@@ -111,6 +111,7 @@ if __name__ == '__main__':
         print("Concorde not installed on the system")
     print("Repeated generation:", s1*full)
 
+    # Careful, this makes sense only for trained models. Otherwise greedy search terminates after just a few steps
     timings, _ = time_operation(
         lambda a: HamS_model.batch_run_greedy_neighbor(a), [d])
     print(f"HamS model greedy: {timings}")
