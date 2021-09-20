@@ -1,12 +1,20 @@
-########OFFICE PC, CPU#####################
-
-Operation times in s: {'data_init': 0.00025391578674316406, 'data_prep': 7.605552673339844e-05, 'pure_logits': 0.050664663314819336, 'neighbor_logits': 0.0005893707275390625, 'probs_computation': 0.0027265548706054688, 'selection': 0.001210927963256836}
-Fraction of time spent on operation: {'data_init': 0.0045732885594785165, 'data_prep': 0.0013698394840128139, 'pure_logits': 0.9125235105679466, 'neighbor_logits': 0.010615182459183936, 'probs_computation': 0.04910810137671015, 'selection': 0.021810077552667968}
-Single run, 0.019254684448242188, components total 0.055521488189697266
-Concorde solver: [5.497135639190674]
-Repeated generation: 9.627342224121094
-HamS model greedy: [5.7112720012664795]
+Laptop, gpu on battery 100 nodes
+Operation times in s: {'data_init': 0.0010004043579101562, 'data_prep': 0.05196118354797363, 'encoding': 0.029323339462280273, 'processing': 0.0895848274230957, 'decoding': 0.058962345123291016, 'neighbor_logits': 0.6802151203155518, 'probs_computation': 0.23725676536560059, 'selection': 0.20026469230651855}
+Fraction of time spent on operation: {'data_init': 0.0007418267784969946, 'data_prep': 0.03853061723842076, 'encoding': 0.021744046071049537, 'processing': 0.06642956261037458, 'decoding': 0.04372216713131023, 'neighbor_logits': 0.5043978341345333, 'probs_computation': 0.17593228231777377, 'selection': 0.14850166371804077}
+Single run, 0.07648921012878418, components total 1.3485686779022217
 ###########################################
+
+Laptop, cpu on battery, 100 nodes
+Operation times in s: {'data_init': 0.0, 'data_prep': 0.0049440860748291016, 'encoding': 0.0, 'processing': 0.0010006427764892578, 'decoding': 0.028636932373046875, 'neighbor_logits': 0.13289093971252441, 'probs_computation': 0.11337494850158691, 'selection': 0.02816152572631836}
+Fraction of time spent on operation: {'data_init': 0.0, 'data_prep': 0.015999808653491533, 'encoding': 0.0, 'processing': 0.003238231032391569, 'decoding': 0.09267343477784516, 'neighbor_logits': 0.43005513557054437, 'probs_computation': 0.3668984428406315, 'selection': 0.09113494712509587}
+Forward step, 0.016910314559936523, components total 0.3090090751647949
+#####
+
+Lapto, cpu on battery, 1000 nodes
+Operation times in s: {'data_init': 0.002217531204223633, 'data_prep': 0.0, 'encoding': 0.0, 'processing': 0.018495798110961914, 'decoding': 0.028640031814575195, 'neighbor_logits': 0.0, 'probs_computation': 0.0, 'selection': 0.0}
+Fraction of time spent on operation: {'data_init': 0.0449317159654691, 'data_prep': 0.0, 'encoding': 0.0, 'processing': 0.37476268459877393, 'decoding': 0.580305599435757, 'neighbor_logits': 0.0, 'probs_computation': 0.0, 'selection': 0.0}
+Forward step, 0.03429007530212402, components total 0.04935336112976074
+
 Processor residual net
 {'layer0': 0.04023480415344238, 'layer1': 0.002712249755859375, 'layer2': 0.002282857894897461, 'layer3': 0.0023109912872314453, 'layer4': 0.0023903846740722656}
 

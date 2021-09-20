@@ -41,9 +41,8 @@ def operation_forward_step(model: HamiltonianCycleFinder, d: torch_g.data.Data):
     return model.next_step_prob_masked_over_neighbors(d)
 
 
-def profile_EPD(model: EncodeProcessDecodeAlgorithm, d):
+def profile_EPD(model: EncodeProcessDecodeAlgorithm, d: torch_g.data.Batch):
     times = {}
-    d = torch_g.data.Batch.from_data_list([d])
     times["data_init"], _ = time_operation(lambda a: model.init_graph(a), [d])
     times["data_prep"], _ = time_operation(lambda a: model.prepare_for_first_step(a, [0]), [d])
 
@@ -56,7 +55,8 @@ def profile_EPD(model: EncodeProcessDecodeAlgorithm, d):
 
     def greedy_choice(p):
         choice = torch.argmax(
-            torch.isclose(p, torch.max(p, dim=-1)[0][..., None]) * (p + torch.randperm(p.shape[-1])[None, ...]), dim=-1)
+            torch.isclose(p, torch.max(p, dim=-1)[0][..., None])
+            * (p + torch.randperm(p.shape[-1], device=p.device)[None, ...]), dim=-1)
         choice = choice + torch_scatter.scatter_sum(d.batch, d.batch, dim_size=d.num_graphs)
         return choice
 
@@ -68,7 +68,7 @@ def profile_ResidualMPNN(net: ResidualMultilayerMPNN, x, edge_index, edge_weight
     timings = {}
     layer_index =0
     for l in net.layers:
-        # timings[f"layer{layer_index}x1"], x = time_operation(lambda a: l.forward(x, edge_index, edge_weight), [x])
+        timings[f"layer{layer_index}x1"], x = time_operation(lambda a: l.forward(x, edge_index, edge_weight), [x])
 
         layer_index += 1
     print(timings)
@@ -90,7 +90,7 @@ if __name__ == '__main__':
         profile_ResidualMPNN(net, x, edge_index, edge_weight)
 
     generator = ErdosRenyiGenerator(s1, 0.8)
-    d = next(iter(generator)).to(device_name)
+    d = torch_g.data.Batch.from_data_list([next(iter(generator))]).to(device_name)
     times = profile_EPD(HamS_model, d)
     print(f"Operation times in s: {times}")
     total = sum(times.values())
@@ -98,9 +98,9 @@ if __name__ == '__main__':
     print(f"Fraction of time spent on operation: {perc}")
 
     d = next(iter(generator)).to(device_name)
-    d = torch_g.data.Batch.from_data_list([d])
+    d = torch_g.data.Batch.from_data_list([d]).to(device_name)
     full, _ = time_operation(lambda a: operation_forward_step(HamS_model, a), [d])
-    print(f"Single run, {full}, components total {total}")
+    print(f"Forward step, {full}, components total {total}")
 
     sizes = [s1]
     try:

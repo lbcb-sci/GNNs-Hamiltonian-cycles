@@ -10,14 +10,11 @@ import torchinfo
 from src.NN_modules import ResidualMultilayerMPNN, MultilayerGatedGCN
 from src.constants import MODEL_WEIGHTS_FOLDER
 
-# "gpu" is currently not supported
-DEVICE = "cpu"
-
 
 class WalkUpdater:
     @staticmethod
     def batch_prepare_for_first_step(d: torch_g.data.Batch, starting_nodes):
-        d.x = torch.zeros([d.num_nodes, 3], device=DEVICE)
+        d.x = torch.zeros([d.num_nodes, 3], device=d.edge_index.device)
         if starting_nodes is not None:
             d.x[starting_nodes, ...] = 1
         return d
@@ -50,14 +47,11 @@ class HamiltonianCycleFinder(ABC):
 
     @staticmethod
     def _neighbor_mask(d: torch_g.data.Data):
-        current = torch.where(torch.isclose(d.x[..., 1], torch.ones_like(d.x[..., 1])), 1, 0)
-        if not current.any():
-            return torch.ones_like(current)
-        transposed_adjacency = torch.sparse_coo_tensor(
-            torch.flip(d.edge_index, dims=[0]), torch.ones_like(d.edge_index[0, ...]), [d.num_nodes, d.num_nodes])
-        valid_mask = (torch.sparse.mm(transposed_adjacency, current.unsqueeze(-1))
-                                + current.unsqueeze(-1)).squeeze(dim=-1)
-        return valid_mask
+        current = torch.nonzero(torch.isclose(d.x[..., 1], torch.ones_like(d.x[..., 1]))).squeeze(-1)
+        if current.numel == 0:
+            return torch.ones_like(d.x[..., 1])
+        neighbor_index = d.edge_index[1, torch.any(d.edge_index[None, 0, :] == current[:, None], dim=0)]
+        return neighbor_index.unique()
 
     @staticmethod
     def _mask_neighbor_logits(logits, d: torch_g.data.Data):
@@ -110,7 +104,8 @@ class HamiltonianCycleFinder(ABC):
     def _neighbor_prob_and_greedy_choice_for_batch(self, d: torch_g.data.Batch):
         p = self.next_step_prob_masked_over_neighbors(d).reshape([d.num_graphs, -1])
         choice = torch.argmax(
-            torch.isclose(p, torch.max(p, dim=-1)[0][..., None]) * (p + torch.randperm(p.shape[-1])[None, ...]), dim=-1)
+            torch.isclose(p, torch.max(p, dim=-1)[0][..., None])
+            * (p + torch.randperm(p.shape[-1], device=p.device)[None, ...]), dim=-1)
         choice = choice + torch_scatter.scatter_sum(d.batch, d.batch, dim_size=d.num_graphs)
         return p, choice
 
@@ -146,7 +141,8 @@ class HamiltonianCycleFinder(ABC):
                     walk = torch.cat([walk, -1 * torch.ones([walk.shape[0], nodes_per_graph - step], dtype=walk.dtype,
                                                             device=walk.device)], dim=-1)
                     selections = torch.cat(
-                        [selections, -1 * torch.ones(selections.shape[0], nodes_per_graph - step, selections.shape[2])],
+                        [selections, -1 * torch.ones(
+                            selections.shape[0],nodes_per_graph - step, selections.shape[2], device=selections.device)],
                         dim=-2)
                     break
 
@@ -170,7 +166,7 @@ class EncodeProcessDecodeAlgorithm(HamiltonianCycleFinder):
         return encoder_nn, decoder_nn
 
     def __init__(self, is_load_weights=True, processor_depth=3, in_dim=1, out_dim=1, hidden_dim=32,
-                 device=DEVICE, graph_updater=WalkUpdater()):
+                 device="cpu", graph_updater=WalkUpdater()):
         super(EncodeProcessDecodeAlgorithm, self).__init__(graph_updater)
         self.PROCESSOR_NAME = f"{self.__class__.__name__}_Processor.tar"
         self.ENCODER_NAME = f"{self.__class__.__name__}_Encoder.tar"
@@ -259,7 +255,7 @@ class EmbeddingAndMaxMPNN(HamiltonCycleFinderWithValueFunction):
         return processor, processor_out_projection
 
     def __init__(self, is_load_weights=True, in_dim=3, out_dim=2, hidden_dim=32, embedding_depth=5, processor_depth=5,
-                 device=DEVICE, graph_updater=WalkUpdater()):
+                 device="cpu", graph_updater=WalkUpdater()):
         super(EmbeddingAndMaxMPNN, self).__init__(graph_updater)
         self.EMBEDDING_NAME = "{}-Embedding.tar".format(self.__class__.__name__)
         self.PROCESSOR_NAME = "{}-Processor.tar".format(self.__class__.__name__)
