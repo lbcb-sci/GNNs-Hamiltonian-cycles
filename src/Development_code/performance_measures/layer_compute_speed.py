@@ -2,6 +2,7 @@ import time
 import itertools
 
 import torch
+from torch.profiler import profile, record_function, ProfilerActivity
 import torch_geometric as torch_g
 import torch_scatter
 
@@ -16,10 +17,10 @@ def time_operation(operation, dataset):
     nr_examples = 0
     result = None
     for d in dataset:
-        start_time = time.time()
+        start_time = time.time_ns()
         result = operation(d)
-        end_time = time.time()
-        total_time += end_time - start_time
+        end_time = time.time_ns()
+        total_time += (end_time - start_time) // 1e9
         nr_examples += 1
     return total_time / nr_examples, result
 
@@ -64,10 +65,15 @@ def profile_EPD(model: EncodeProcessDecodeAlgorithm, d: torch_g.data.Batch):
 
     return times
 
+
 def profile_ResidualMPNN(net: ResidualMultilayerMPNN, x, edge_index, edge_weight):
     timings = {}
     layer_index =0
     for l in net.layers:
+        with profile(activities=[ProfilerActivity.CPU], record_shapes=True) as prof:
+            with record_function("inference"):
+                l.forward(x, edge_index, edge_weight)
+        print(prof.key_averages().table(sort_by="cpu_time_total", row_limit=20))
         timings[f"layer{layer_index}x1"], x = time_operation(lambda a: l.forward(x, edge_index, edge_weight), [x])
 
         layer_index += 1
@@ -75,9 +81,9 @@ def profile_ResidualMPNN(net: ResidualMultilayerMPNN, x, edge_index, edge_weight
 
 
 if __name__ == '__main__':
-    import sys
-    device_name = "cpu"
+    device_name = "cuda"
     s1 = 10_000
+    number_format = "%.6f"
     d = next(iter(ErdosRenyiGenerator(s1, 0.8))).to(device_name)
 
     HamS_model = EncodeProcessDecodeAlgorithm(False, processor_depth=2, hidden_dim=32, device=device_name)
@@ -92,24 +98,26 @@ if __name__ == '__main__':
     generator = ErdosRenyiGenerator(s1, 0.8)
     d = torch_g.data.Batch.from_data_list([next(iter(generator))]).to(device_name)
     times = profile_EPD(HamS_model, d)
-    print(f"Operation times in s: {times}")
+    formatted_times = {k: number_format % t for k, t in times.items()}
+    print(f"Operation times in s: {formatted_times}")
     total = sum(times.values())
-    perc = {k: v/total for k, v in times.items()}
-    print(f"Fraction of time spent on operation: {perc}")
+    formatted_perc = {k: number_format % (v/(total + 1e-8)) for k, v in times.items()}
+    print(f"Fraction of time spent on operation: {formatted_perc}")
 
     d = next(iter(generator)).to(device_name)
     d = torch_g.data.Batch.from_data_list([d]).to(device_name)
     full, _ = time_operation(lambda a: operation_forward_step(HamS_model, a), [d])
-    print(f"Forward step, {full}, components total {total}")
+    print(f"Forward step, {number_format % full}, components total {number_format % total}")
 
     sizes = [s1]
     try:
         concorde_solver = ConcordeHamiltonSolver()
         timings = time_operation_on_ER(lambda d: concorde_solver.solve(d), sizes, nr_examples_per_size=1)
+        formatted_timings = [number_format % t for t in timings]
         print(f"Concorde solver: {timings}")
     except:
         print("Concorde not installed on the system")
-    print("Repeated generation:", s1*full)
+    print(f"Repeated generation: {number_format % (s1*full)}")
 
     # Careful, this makes sense only for trained models. Otherwise greedy search terminates after just a few steps
     timings, _ = time_operation(
