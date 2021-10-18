@@ -12,10 +12,9 @@ from src.ExactSolvers import ConcordeHamiltonSolver
 from src.NN_modules import ResidualMultilayerMPNN
 
 
-def time_operation(operation, dataset):
+def _time_operation_cpu(operation, dataset):
     total_time = 0
     nr_examples = 0
-    result = None
     for d in dataset:
         start_time = time.time_ns()
         result = operation(d)
@@ -25,18 +24,38 @@ def time_operation(operation, dataset):
     return total_time / nr_examples, result
 
 
-def time_operation_on_ER(operation, sizes=None, ham_prob=0.8, nr_examples_per_size=10):
+def _time_operation_cuda(operation, dataset):
+    nr_examples = 0
+    start = torch.cuda.Event(enable_timing=True)
+    end = torch.cuda.Event(enable_timing=True)
+    start.record()
+    for d in dataset:
+        result = operation(d)
+        nr_examples += 1
+    end.record()
+    torch.cuda.synchronize()
+    return  start.elapsed_time(end) / 1000 / nr_examples, result
+
+
+def time_operation(operation, dataset, device):
+    if device == "cpu":
+        return _time_operation_cpu(operation, dataset)
+    elif device == "cuda":
+        return _time_operation_cuda(operation, dataset)
+
+
+def time_operation_on_ER(device, operation, sizes=None, ham_prob=0.8, nr_examples_per_size=10):
     if sizes is None:
         sizes = [25, 100, 400, 1600, 5000]
     timings = []
     for s in sizes:
         generator = ErdosRenyiGenerator(s, ham_prob)
-        t, choice = time_operation(operation, itertools.islice(generator, nr_examples_per_size))
+        t, choice = time_operation(operation, itertools.islice(generator, nr_examples_per_size), device)
         timings.append(t)
     return timings
 
 
-def operation_forward_step(model: HamiltonianCycleFinder, d: torch_g.data.Data):
+def operation_forward_step(model: HamiltonianCycleFinder, d: torch_g.data.Batch):
     model.init_graph(d)
     model.prepare_for_first_step(d, torch.tensor([0], device=d.edge_index.device))
     return model.next_step_prob_masked_over_neighbors(d)
@@ -44,15 +63,14 @@ def operation_forward_step(model: HamiltonianCycleFinder, d: torch_g.data.Data):
 
 def profile_EPD(model: EncodeProcessDecodeAlgorithm, d: torch_g.data.Batch):
     times = {}
-    times["data_init"], _ = time_operation(lambda a: model.init_graph(a), [d])
-    times["data_prep"], _ = time_operation(lambda a: model.prepare_for_first_step(a, [0]), [d])
+    times["data_init"], _ = time_operation(lambda a: model.init_graph(a), [d], model.device)
+    times["data_prep"], _ = time_operation(lambda a: model.prepare_for_first_step(a, [0]), [d], model.device)
 
-    times["encoding"], d.z = time_operation(lambda a: model.encoder_nn(torch.cat([a.x, a.h], dim=-1)), [d])
-    times["processing"], d.h = time_operation(lambda a: model.processor_nn(a.z, a.edge_index, a.edge_attr), [d])
-    times["decoding"], l = time_operation(lambda a: torch.squeeze(model.decoder_nn(torch.cat([a.z, a.h], dim=-1)), dim=-1), [d])
-    # times["pure_logits"], l = time_operation(lambda a: model.next_step_logits(a), [d])
-    times["neighbor_logits"], n = time_operation(lambda a: model._mask_neighbor_logits(l, a), [d])
-    times["probs_computation"], p = time_operation(lambda a: torch_scatter.scatter_softmax(n, a.batch), [d])
+    times["encoding"], d.z = time_operation(lambda a: model.encoder_nn(torch.cat([a.x, a.h], dim=-1)), [d], model.device)
+    times["processing"], d.h = time_operation(lambda a: model.processor_nn(a.z, a.edge_index, a.edge_attr), [d], model.device)
+    times["decoding"], l = time_operation(lambda a: torch.squeeze(model.decoder_nn(torch.cat([a.z, a.h], dim=-1)), dim=-1), [d], model.device)
+    times["neighbor_logits"], n = time_operation(lambda a: model._mask_neighbor_logits(l, a), [d], model.device)
+    times["probs_computation"], p = time_operation(lambda a: torch_scatter.scatter_softmax(n, a.batch), [d], model.device)
 
     def greedy_choice(p):
         choice = torch.argmax(
@@ -61,33 +79,34 @@ def profile_EPD(model: EncodeProcessDecodeAlgorithm, d: torch_g.data.Batch):
         choice = choice + torch_scatter.scatter_sum(d.batch, d.batch, dim_size=d.num_graphs)
         return choice
 
-    times["selection"], choice = time_operation(lambda d: greedy_choice(p), [d])
+    times["selection"], choice = time_operation(lambda d: greedy_choice(p), [d], model.device)
 
     return times
 
 
 def profile_ResidualMPNN(net: ResidualMultilayerMPNN, x, edge_index, edge_weight):
-    timings = {}
-    layer_index =0
     for l in net.layers:
         with profile(activities=[ProfilerActivity.CPU], record_shapes=True) as prof:
             with record_function("inference"):
                 l.forward(x, edge_index, edge_weight)
         print(prof.key_averages().table(sort_by="cpu_time_total", row_limit=20))
-        timings[f"layer{layer_index}x1"], x = time_operation(lambda a: l.forward(x, edge_index, edge_weight), [x])
-
-        layer_index += 1
-    print(timings)
 
 
 if __name__ == '__main__':
     device_name = "cuda"
     s1 = 10_000
     number_format = "%.6f"
-    d = next(iter(ErdosRenyiGenerator(s1, 0.8))).to(device_name)
 
-    HamS_model = EncodeProcessDecodeAlgorithm(False, processor_depth=2, hidden_dim=32, device=device_name)
+    d = next(iter(ErdosRenyiGenerator(s1, 0.8)))
+    # This tends to allocate too much memory on GPU
+    d = d.to(device_name)
+
+    HamS_model = EncodeProcessDecodeAlgorithm(True, processor_depth=5, hidden_dim=32, device=device_name)
     net = HamS_model.processor_nn
+
+    # Device warmup
+    _ = torch.einsum("ij,jk -> ik", *[torch.rand([5_000, 5_000], device=device_name) for _ in range(2)])
+
     with torch.no_grad():
         HamS_model.init_graph(d)
         HamS_model.prepare_for_first_step(d, 0)
@@ -106,7 +125,7 @@ if __name__ == '__main__':
 
     d = next(iter(generator)).to(device_name)
     d = torch_g.data.Batch.from_data_list([d]).to(device_name)
-    full, _ = time_operation(lambda a: operation_forward_step(HamS_model, a), [d])
+    full, _ = time_operation(lambda a: operation_forward_step(HamS_model, a), [d], HamS_model.device)
     print(f"Forward step, {number_format % full}, components total {number_format % total}")
 
     sizes = [s1]
@@ -121,9 +140,9 @@ if __name__ == '__main__':
 
     # Careful, this makes sense only for trained models. Otherwise greedy search terminates after just a few steps
     timings, _ = time_operation(
-        lambda a: HamS_model.batch_run_greedy_neighbor(a), [d])
+        lambda a: HamS_model.batch_run_greedy_neighbor(a), [d], HamS_model.device)
     print(f"HamS model greedy: {timings}")
 
     for i in range(3):
-        timings, _ = time_operation(lambda a: HamS_model.next_step_prob_masked_over_neighbors(a), [d])
-        print(f"Rerun {i}: {timings}")
+        timings, _ = time_operation(lambda a: HamS_model.next_step_prob_masked_over_neighbors(a), [d], HamS_model.device)
+        print(f"Probability compute timing Rerun {i}: {timings}")
