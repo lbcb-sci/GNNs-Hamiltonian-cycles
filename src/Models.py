@@ -185,16 +185,16 @@ class EncodeProcessDecodeAlgorithm(HamiltonianCycleFinder):
 
         self.encoder_nn, self.decoder_nn = self._construct_encoder_and_decoder()
         self.processor_nn = self._construct_processor()
-        if device == "cuda":
-            self.to_cuda()
-
         self.initial_h = torch.rand(self.hidden_dim, device=self.device)
+        self.to(device)
+
         if is_load_weights:
             self.load_weights()
 
     def to(self, device):
         for module in [self.decoder_nn, self.encoder_nn, self.processor_nn]:
             module.to(device)
+        self.initial_h = self.initial_h.to(device)
         self.device = device
 
     def to_cuda(self):
