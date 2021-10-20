@@ -3,6 +3,7 @@ import itertools
 from matplotlib import pyplot as plt
 import seaborn
 import pandas
+import pathlib
 
 import torch
 from torch.profiler import profile, record_function, ProfilerActivity
@@ -106,52 +107,62 @@ def profile_ResidualMPNN(net: ResidualMultilayerMPNN, x, edge_index, edge_weight
 
 
 if __name__ == '__main__':
-    device_name = "cpu"
+    figure_output_path = pathlib.Path("src/Development_code/plots_and_test_results/")
+
+    main_device = "cuda"
     number_format = "%.6f"
 
-    HamS_model = EncodeProcessDecodeAlgorithm(True, processor_depth=5, hidden_dim=32, device=device_name)
+    local_devices = ["cpu"]
+    if torch.cuda.is_available() and torch.cuda.get_device_capability()[0] > 3:
+        local_devices += ["cuda"]
+
+    HamS_model = EncodeProcessDecodeAlgorithm(True, processor_depth=5, hidden_dim=32, device=main_device)
     HamS_processor_net = HamS_model.processor_nn
 
-    # Device warmup
-    _ = torch.einsum("ij,jk -> ik", *[torch.rand([5_000, 5_000], device=device_name) for _ in range(2)])
-
-
-    forward_pass_sizes = list(range(100, 50_000, 1000))
-    # forward_pass_s = {}
-    # complete_runtime_s = {}
+    forward_pass_sizes = list(range(100, 10_000, 100))
     records = []
 
     with torch.no_grad():
-
-        for s in forward_pass_sizes:
-            local_devices = ["cpu"]
-            if torch.cuda.is_available() and torch.cuda.get_device_capability()[0] > 3:
-                local_devices += ["cuda"]
-            for l_device in local_devices:
-                HamS_model.to(l_device)
+        for l_device in local_devices:
+            # Device warmup
+            _ = torch.einsum("ij,jk -> ik", *[torch.rand([5_000, 5_000], device=main_device) for _ in range(2)])
+            HamS_model.to(l_device)
+            for s in forward_pass_sizes:
                 graph_generator = ErdosRenyiGenerator(s, 0.8)
                 d = torch_g.data.Batch.from_data_list([next(iter(graph_generator))]).to(HamS_model.device)
                 forward_pass_s, _ = time_operation(
                     lambda a: operation_forward_step(HamS_model, a), [d], HamS_model.device)
+
+                HamS_model.init_graph(d)
+                HamS_model.prepare_for_first_step(d, 0)
+                x = HamS_model.encoder_nn.forward(torch.cat([d.x, d.h], dim=-1))
+                edge_index = d.edge_index
+                edge_weight = d.edge_attr
+                processor_forward_s, _ = time_operation(
+                    lambda a: HamS_model.processor_nn.forward(x, edge_index, edge_weight), [d], HamS_model.device)
+
                 records.append({"device": l_device, "size": s, "forward_pass_s": forward_pass_s,
-                                "runtime_estimate_s": forward_pass_s * s})
+                                "runtime_estimate_s": forward_pass_s * s, "processor_nn_s": processor_forward_s})
     df_forward_pass = pandas.DataFrame.from_records(records)
 
     fig, (ax1, ax2) = plt.subplots(1, 2)
 
-    seaborn.lineplot(x="size", y="forward_pass_s", data=df_forward_pass, ax=ax1, hue="device")
-    seaborn.lineplot("size", "runtime_estimate_s", data=df_forward_pass, ax=ax2, hue="device")
+    seaborn.lineplot(x="size", y="runtime_estimate_s", data=df_forward_pass, ax=ax1, hue="device")
+    seaborn.lineplot(x="size", y="forward_pass_s", data=df_forward_pass, ax=ax2, hue="device")
     plt.show()
-    exit(-1)
+    fig.savefig(figure_output_path / "pytorch_devices_inference_time")
 
+    df_largest_graphs = df_forward_pass[df_forward_pass["size"] == df_forward_pass["size"].max()]
+    fastest_device = df_largest_graphs[
+        df_largest_graphs["forward_pass_s"] == df_largest_graphs["forward_pass_s"].min()]["device"].item()
 
-    sizes = [100, 1000, 10_000]
+    sizes = [1000]
     with torch.no_grad():
         for s in sizes:
             graph_generator = ErdosRenyiGenerator(s, 0.8)
             d = next(iter(graph_generator))
             # This tends to allocate too much memory on GPU
-            d = d.to(device_name)
+            d = d.to(main_device)
 
             HamS_model.init_graph(d)
             HamS_model.prepare_for_first_step(d, 0)
@@ -160,7 +171,7 @@ if __name__ == '__main__':
             profile_ResidualMPNN(HamS_processor_net, x, edge_index, edge_weight)
 
             graph_generator = ErdosRenyiGenerator(s, 0.8)
-            d = torch_g.data.Batch.from_data_list([next(iter(graph_generator))]).to(device_name)
+            d = torch_g.data.Batch.from_data_list([next(iter(graph_generator))]).to(main_device)
             times = profile_EPD(HamS_model, d)
             formatted_times = {k: number_format % t for k, t in times.items()}
             print(f"Operation times in s: {formatted_times}")
