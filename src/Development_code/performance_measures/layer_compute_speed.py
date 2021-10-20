@@ -1,5 +1,8 @@
 import time
 import itertools
+from matplotlib import pyplot as plt
+import seaborn
+import pandas
 
 import torch
 from torch.profiler import profile, record_function, ProfilerActivity
@@ -19,7 +22,7 @@ def _time_operation_cpu(operation, dataset):
         start_time = time.time_ns()
         result = operation(d)
         end_time = time.time_ns()
-        total_time += (end_time - start_time) // 1e9
+        total_time += (end_time - start_time) / 1e9
         nr_examples += 1
     return total_time / nr_examples, result
 
@@ -34,7 +37,7 @@ def _time_operation_cuda(operation, dataset):
         nr_examples += 1
     end.record()
     torch.cuda.synchronize()
-    return  start.elapsed_time(end) / 1000 / nr_examples, result
+    return start.elapsed_time(end) / 1000 / nr_examples, result
 
 
 def time_operation(operation, dataset, device):
@@ -61,21 +64,31 @@ def operation_forward_step(model: HamiltonianCycleFinder, d: torch_g.data.Batch)
     return model.next_step_prob_masked_over_neighbors(d)
 
 
-def profile_EPD(model: EncodeProcessDecodeAlgorithm, d: torch_g.data.Batch):
+def profile_data_preparation(model: HamiltonianCycleFinder, d: torch_g.data.Batch):
     times = {}
     times["data_init"], _ = time_operation(lambda a: model.init_graph(a), [d], model.device)
     times["data_prep"], _ = time_operation(lambda a: model.prepare_for_first_step(a, [0]), [d], model.device)
+    return times, d
 
-    times["encoding"], d.z = time_operation(lambda a: model.encoder_nn(torch.cat([a.x, a.h], dim=-1)), [d], model.device)
-    times["processing"], d.h = time_operation(lambda a: model.processor_nn(a.z, a.edge_index, a.edge_attr), [d], model.device)
-    times["decoding"], l = time_operation(lambda a: torch.squeeze(model.decoder_nn(torch.cat([a.z, a.h], dim=-1)), dim=-1), [d], model.device)
-    times["neighbor_logits"], n = time_operation(lambda a: model._mask_neighbor_logits(l, a), [d], model.device)
-    times["probs_computation"], p = time_operation(lambda a: torch_scatter.scatter_softmax(n, a.batch), [d], model.device)
+
+def profile_EPD(model: EncodeProcessDecodeAlgorithm, d: torch_g.data.Batch):
+    times, d = profile_data_preparation(model, d)
+
+    times["encoding"], d.z = time_operation(
+        lambda a: model.encoder_nn(torch.cat([a.x, a.h], dim=-1)), [d], model.device)
+    times["processing"], d.h = time_operation(
+        lambda a: model.processor_nn(a.z, a.edge_index, a.edge_attr), [d], model.device)
+    times["decoding"], l = time_operation(
+        lambda a: torch.squeeze(model.decoder_nn(torch.cat([a.z, a.h], dim=-1)), dim=-1), [d], model.device)
+    times["neighbor_logits"], n = time_operation(
+        lambda a: model._mask_neighbor_logits(l, a), [d], model.device)
+    times["probs_computation"], p = time_operation(
+        lambda a: torch_scatter.scatter_softmax(n, a.batch), [d], model.device)
 
     def greedy_choice(p):
         choice = torch.argmax(
             torch.isclose(p, torch.max(p, dim=-1)[0][..., None])
-            * (p + torch.randperm(p.shape[-1], device=p.device)[None, ...]), dim=-1)
+            * torch.randperm(p.shape[-1], device=p.device)[None, ...], dim=-1)
         choice = choice + torch_scatter.scatter_sum(d.batch, d.batch, dim_size=d.num_graphs)
         return choice
 
@@ -93,56 +106,78 @@ def profile_ResidualMPNN(net: ResidualMultilayerMPNN, x, edge_index, edge_weight
 
 
 if __name__ == '__main__':
-    device_name = "cuda"
-    s1 = 10_000
+    device_name = "cpu"
     number_format = "%.6f"
 
-    d = next(iter(ErdosRenyiGenerator(s1, 0.8)))
-    # This tends to allocate too much memory on GPU
-    d = d.to(device_name)
-
     HamS_model = EncodeProcessDecodeAlgorithm(True, processor_depth=5, hidden_dim=32, device=device_name)
-    net = HamS_model.processor_nn
+    HamS_processor_net = HamS_model.processor_nn
 
     # Device warmup
     _ = torch.einsum("ij,jk -> ik", *[torch.rand([5_000, 5_000], device=device_name) for _ in range(2)])
 
+
+    forward_pass_sizes = list(range(100, 50_000, 1000))
+    # forward_pass_s = {}
+    # complete_runtime_s = {}
+    records = []
+
     with torch.no_grad():
-        HamS_model.init_graph(d)
-        HamS_model.prepare_for_first_step(d, 0)
-        x = HamS_model.encoder_nn.forward(torch.cat([d.x, d.h], dim=-1))
-        edge_index, edge_weight = d.edge_index, d.edge_attr
-        profile_ResidualMPNN(net, x, edge_index, edge_weight)
 
-    generator = ErdosRenyiGenerator(s1, 0.8)
-    d = torch_g.data.Batch.from_data_list([next(iter(generator))]).to(device_name)
-    times = profile_EPD(HamS_model, d)
-    formatted_times = {k: number_format % t for k, t in times.items()}
-    print(f"Operation times in s: {formatted_times}")
-    total = sum(times.values())
-    formatted_perc = {k: number_format % (v/(total + 1e-8)) for k, v in times.items()}
-    print(f"Fraction of time spent on operation: {formatted_perc}")
+        for s in forward_pass_sizes:
+            local_devices = ["cpu"]
+            if torch.cuda.is_available() and torch.cuda.get_device_capability()[0] > 3:
+                local_devices += ["cuda"]
+            for l_device in local_devices:
+                HamS_model.to(l_device)
+                graph_generator = ErdosRenyiGenerator(s, 0.8)
+                d = torch_g.data.Batch.from_data_list([next(iter(graph_generator))]).to(HamS_model.device)
+                forward_pass_s, _ = time_operation(
+                    lambda a: operation_forward_step(HamS_model, a), [d], HamS_model.device)
+                records.append({"device": l_device, "size": s, "forward_pass_s": forward_pass_s,
+                                "runtime_estimate_s": forward_pass_s * s})
+    df_forward_pass = pandas.DataFrame.from_records(records)
 
-    d = next(iter(generator)).to(device_name)
-    d = torch_g.data.Batch.from_data_list([d]).to(device_name)
-    full, _ = time_operation(lambda a: operation_forward_step(HamS_model, a), [d], HamS_model.device)
-    print(f"Forward step, {number_format % full}, components total {number_format % total}")
+    fig, (ax1, ax2) = plt.subplots(1, 2)
 
-    sizes = [s1]
-    try:
-        concorde_solver = ConcordeHamiltonSolver()
-        timings = time_operation_on_ER(lambda d: concorde_solver.solve(d), sizes, nr_examples_per_size=1)
-        formatted_timings = [number_format % t for t in timings]
-        print(f"Concorde solver: {timings}")
-    except:
-        print("Concorde not installed on the system")
-    print(f"Repeated generation: {number_format % (s1*full)}")
+    seaborn.lineplot(x="size", y="forward_pass_s", data=df_forward_pass, ax=ax1, hue="device")
+    seaborn.lineplot("size", "runtime_estimate_s", data=df_forward_pass, ax=ax2, hue="device")
+    plt.show()
+    exit(-1)
 
-    # Careful, this makes sense only for trained models. Otherwise greedy search terminates after just a few steps
-    timings, _ = time_operation(
-        lambda a: HamS_model.batch_run_greedy_neighbor(a), [d], HamS_model.device)
-    print(f"HamS model greedy: {timings}")
 
-    for i in range(3):
-        timings, _ = time_operation(lambda a: HamS_model.next_step_prob_masked_over_neighbors(a), [d], HamS_model.device)
-        print(f"Probability compute timing Rerun {i}: {timings}")
+    sizes = [100, 1000, 10_000]
+    with torch.no_grad():
+        for s in sizes:
+            graph_generator = ErdosRenyiGenerator(s, 0.8)
+            d = next(iter(graph_generator))
+            # This tends to allocate too much memory on GPU
+            d = d.to(device_name)
+
+            HamS_model.init_graph(d)
+            HamS_model.prepare_for_first_step(d, 0)
+            x = HamS_model.encoder_nn.forward(torch.cat([d.x, d.h], dim=-1))
+            edge_index, edge_weight = d.edge_index, d.edge_attr
+            profile_ResidualMPNN(HamS_processor_net, x, edge_index, edge_weight)
+
+            graph_generator = ErdosRenyiGenerator(s, 0.8)
+            d = torch_g.data.Batch.from_data_list([next(iter(graph_generator))]).to(device_name)
+            times = profile_EPD(HamS_model, d)
+            formatted_times = {k: number_format % t for k, t in times.items()}
+            print(f"Operation times in s: {formatted_times}")
+            total = sum(times.values())
+            formatted_perc = {k: number_format % (v/(total + 1e-8)) for k, v in times.items()}
+            print(f"Fraction of time spent on operation: {formatted_perc}")
+
+            # Careful, this makes sense only for trained models. Otherwise greedy search terminates after just a few steps
+            timing, path = time_operation(
+                lambda a: HamS_model.batch_run_greedy_neighbor(a), [d], HamS_model.device)
+            print(f"Experimental graph runtime: {number_format % timing}. Path length={len(path)}"
+                  f" -> projected graph runtime{number_format % (timing * s / len(path))}.")
+
+            try:
+                concorde_solver = ConcordeHamiltonSolver()
+                timings = time_operation_on_ER(lambda d: concorde_solver.solve(d), sizes, nr_examples_per_size=1)
+                formatted_timings = [number_format % t for t in timings]
+                print(f"Concorde solver time: {number_format % timings}")
+            except:
+                print("Concorde not installed on the system")

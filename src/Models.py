@@ -82,6 +82,10 @@ class HamiltonianCycleFinder(ABC):
         pass
 
     @abstractmethod
+    def to(self, device) -> None:
+        pass
+
+    @abstractmethod
     def get_device(self) -> str:
         pass
 
@@ -188,10 +192,13 @@ class EncodeProcessDecodeAlgorithm(HamiltonianCycleFinder):
         if is_load_weights:
             self.load_weights()
 
-    def to_cuda(self):
+    def to(self, device):
         for module in [self.decoder_nn, self.encoder_nn, self.processor_nn]:
-            module.cuda()
-        self.device = "cuda"
+            module.to(device)
+        self.device = device
+
+    def to_cuda(self):
+        self.to("cuda")
 
     def get_device(self):
         return self.device
