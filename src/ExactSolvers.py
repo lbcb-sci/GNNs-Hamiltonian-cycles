@@ -78,7 +78,7 @@ class ConcordeHamiltonSolver:
     def __del__(self):
         self.clean()
 
-    def create_input_file(self, d: torch_g.data.Data, output_file=None, name="Unnamed instance"):
+    def create_input_file(self, d: torch_g.data.Data, output_file=None, name="Unnamed_instance.tsp"):
         if output_file is None:
             output_file = os.path.join(self.CONCORDE_WORK_DIR, self.CONCORDE_INPUT_FILE)
 
@@ -102,22 +102,36 @@ class ConcordeHamiltonSolver:
         with open(output_file, "w") as out:
             out.write(out_string)
 
-    def solve(self, d: torch_g.data.Data, input_file=None):
+    def time_execution(self, d: torch_g.data.Data, input_file=None):
         if input_file is None:
             self.create_input_file(d)
             input_file = os.path.join(self.CONCORDE_WORK_DIR, self.CONCORDE_INPUT_FILE)
         input_file = os.path.abspath(input_file)
-        called_process = subprocess.run([self.CONCORDE_SCRIPT_PATH, input_file], cwd=self.CONCORDE_WORK_DIR, capture_output=True)
-        regex = re.search(r"Optimal Solution: ([0-9.]+)", called_process.stdout.decode("utf-8"))
-        optimal_len = round(float(regex.group(0).split(":")[1].strip()))
+        called_process = subprocess.run(["time", self.CONCORDE_SCRIPT_PATH, input_file],
+                                        cwd=self.CONCORDE_WORK_DIR, capture_output=True)
+        string_stdout, string_stderr = [
+            out_stream.decode("utf-8") for out_stream in [called_process.stdout, called_process.stderr]]
+
+        optimal_len_regex = re.search(r"Optimal Solution: ([0-9.]+)", string_stdout)
+        optimal_len = round(float(optimal_len_regex.group(0).split(":")[1].strip()))
+
+        user_time_regex = re.search(r"([0-9.]+)user", string_stderr)
+        real_time_regex = re.search(r"([0-9.]+):([0-9.]+)elapsed", string_stderr)
+        user_time = float(user_time_regex.group(1))
+        real_time = float(real_time_regex.group(1)) * 60 + float(real_time_regex.group(2))
 
         if optimal_len != d.num_nodes:
-            return []
-        base_name, extension = os.path.splitext(input_file)
-        with open(base_name + ".sol", "r") as result:
-            lines = result.readlines()
-            tour = [int(x) for i in range(1, len(lines)) for x in lines[i].split()]
-            return tour
+            tour = []
+        else:
+            base_name, extension = os.path.splitext(input_file)
+            with open(base_name + ".sol", "r") as result:
+                lines = result.readlines()
+                tour = [int(x) for i in range(1, len(lines)) for x in lines[i].split()]
+
+        return tour, real_time, user_time
+
+    def solve(self, d: torch_g.data.Data, input_file=None):
+        return self.time_execution(d, input_file)[0]
 
 
 if __name__ == '__main__':
