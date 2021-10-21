@@ -10,7 +10,8 @@ def _generate_ERmk_model_edge_index_for_small_k(num_nodes, num_edges):
     original_dtype = numpy.int64
     _generation_overhead = 0.1
     edge_index = numpy.empty([0, 2], dtype=original_dtype)
-    while edge_index.shape[0] < num_edges:
+    num_edges_including_symmetric_ones = 2*num_edges
+    while edge_index.shape[0] < num_edges_including_symmetric_ones:
         points_to_generate = 2 * (num_edges + int(num_edges * _generation_overhead))
         generated_edges = numpy.random.randint(0, num_nodes, size=[points_to_generate],
                                                dtype=original_dtype)
@@ -23,10 +24,9 @@ def _generate_ERmk_model_edge_index_for_small_k(num_nodes, num_edges):
         symmetrized_edges = pandas.unique(symmetrized_edges)
         symmetrized_edges = symmetrized_edges.view(dtype=original_dtype).reshape([symmetrized_edges.shape[0], 2])
         symmetrized_edges = symmetrized_edges[symmetrized_edges[:, 0] != symmetrized_edges[:, 1]]
-        new_edges = symmetrized_edges[0::2]
-        edge_index = numpy.concatenate([edge_index, new_edges], axis=0)
+        edge_index = numpy.concatenate([edge_index, symmetrized_edges], axis=0)
     edge_index = torch.t(torch.from_numpy(edge_index))
-    return edge_index[:, :num_edges]
+    return edge_index[:, :num_edges_including_symmetric_ones]
 
 
 def generate_ERp_model_edge_index_for_small_k(num_nodes, prob):
