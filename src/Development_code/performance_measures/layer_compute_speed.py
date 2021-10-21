@@ -24,9 +24,9 @@ def _time_operation_cpu(operation, dataset):
     nr_examples = 0
     results = []
     for d in dataset:
-        start_time = time.time_ns()
+        start_time = time.process_time_ns()
         result = operation(d)
-        end_time = time.time_ns()
+        end_time = time.process_time_ns()
         results.append(result)
         total_time += (end_time - start_time) / 1e9
         nr_examples += 1
@@ -185,7 +185,7 @@ if __name__ == '__main__':
         seaborn.barplot(x="component", y="runtime", data=df_component_runtimes, ax=ax).set_title("Component runtimes")
         fig.savefig(figure_output_path / "component runtimes")
 
-        runtime_comparison_sizes = [50, 100, 150, 250, 500, 1000]
+        runtime_comparison_sizes = [50, 100, 150, 250, 500, 1000, 2000, 4000, 8000]
         nr_examples_per_size = 2
         records = []
         for s in runtime_comparison_sizes:
@@ -199,8 +199,8 @@ if __name__ == '__main__':
                              "path_size": nn_path_len}]
                 try:
                     concorde_solver = ConcordeHamiltonSolver()
-                    concorde_time, [concorde_path] = time_operation(lambda a: concorde_solver.solve(a), [d], device="cpu")
-                    records += [{"description": "Concorde", "graph_size": s, "runtime": concorde_time,
+                    concorde_path, concorde_process_time, _ = concorde_solver.time_execution(d)
+                    records += [{"description": "Concorde", "graph_size": s, "runtime": concorde_process_time,
                                 "path_size": s}]
                 except Exception as ex:
                     print("Concorde not installed on the system")
