@@ -25,8 +25,8 @@ if __name__ == '__main__':
                 print("The graph is not Hamiltonian")
                 continue
 
-            fig_circular_layout = display_result_on_known_hamilton_graphs(d, cycle, cycle, display_node_labels=False,
-                                                          neural_path_color="black")
+            fig_circular_layout = display_result_on_known_hamilton_graphs(
+                d, cycle, cycle, display_node_labels=False, neural_path_color="black")
             fig_circular_layout.show()
             nn_path, distributions = hamS.batch_run_greedy_neighbor(torch_g.data.Batch.from_data_list([d]))
             valid_path = EvaluationScores.verify_only_neighbor_connections(d, nn_path)
@@ -34,9 +34,9 @@ if __name__ == '__main__':
             if len(nn_path) != graph_size + 1 or not valid_path or nn_path[0] != nn_path[-1]:
                 print("Neural network failed to find a Hamilton cycle!")
                 continue
-            fig_predicted_cylce = display_result_on_known_hamilton_graphs(d, nn_path, cycle, display_node_labels=False,
-                                                                          neural_path_color="red", remaining_edges_style="dotted")
-            fig_predicted_cylce.show()
+            fig_predicted_cyclce = display_result_on_known_hamilton_graphs(
+                d, nn_path, cycle, display_node_labels=False, neural_path_color="red", remaining_edges_style="dotted")
+            fig_predicted_cyclce.show()
             plt.show()
 
         else:
