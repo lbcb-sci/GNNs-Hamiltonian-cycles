@@ -15,7 +15,7 @@ def _least_degree_first(g: networkit.Graph, start_node, is_use_unreachable_verte
     g = deepcopy(g)
     current = start_node
     path = []
-    for step in range(num_nodes):
+    for step in range(g.numberOfNodes()):
         path.append(current)
         next_step_options = sorted([x for x in g.iterNeighbors(current)], key=g.degree)
         g.removeNode(current)

@@ -17,6 +17,7 @@ from src.DatasetBuilder import ErdosRenyiInMemoryDataset, ErdosRenyiGenerator
 from src.Models import GatedGCNEmbedAndProcess, HamiltonianCycleFinder, EncodeProcessDecodeAlgorithm
 from src.ExactSolvers import ConcordeHamiltonSolver
 from src.NN_modules import ResidualMultilayerMPNN
+from src.Development_code.Heuristics import least_degree_first_heuristics, HybridHam
 
 
 def _time_operation_cpu(operation, dataset):
@@ -195,22 +196,30 @@ if __name__ == '__main__':
                     lambda a: HamS_model.batch_run_greedy_neighbor(a),
                     [torch_g.data.batch.Batch.from_data_list([d])], HamS_model.device)
                 nn_path_len = HamS_path_tensor[HamS_path_tensor != -1].unique().shape[0]
-                records += [{"description": "HamS", "graph_size": s, "runtime": HamS_runtime,
-                             "path_size": nn_path_len}]
+                records.append({"description": "HamS", "graph_size": s, "runtime": HamS_runtime,
+                             "path_size": nn_path_len})
+
                 try:
                     concorde_solver = ConcordeHamiltonSolver()
                     concorde_path, concorde_process_time, _ = concorde_solver.time_execution(d)
-                    records += [{"description": "Concorde", "graph_size": s, "runtime": concorde_process_time,
-                                "path_size": s}]
+                    records.append({"description": "Concorde", "graph_size": s, "runtime": concorde_process_time,
+                                "path_size": s})
                 except Exception as ex:
                     print("Concorde not installed on the system")
                     raise ex
-        df_concorde_comparison = pandas.DataFrame.from_records(records)
-        df_concorde_comparison["estimated_runtime"] \
-            = df_concorde_comparison["runtime"] * df_concorde_comparison["graph_size"] / df_concorde_comparison["path_size"]
+
+                for heuristic, description in zip([least_degree_first_heuristics, HybridHam],
+                                                  ["least_degree_first", "HybridHam"]):
+                    runtime, path = time_operation(lambda a: heuristic(a.num_nodes, a.edge_index), [d], "cpu")
+                    records.append({"description": description, "graph_size": s,
+                                "runtime": runtime, "path_size": len(path)})
+
+        df_heuristics_comparison = pandas.DataFrame.from_records(records)
+        df_heuristics_comparison["estimated_runtime"] \
+            = df_heuristics_comparison["runtime"] * df_heuristics_comparison["graph_size"] / df_heuristics_comparison["path_size"]
         fig, ax = plt.subplots()
         seaborn.lineplot(x="graph_size", y="estimated_runtime", hue="description", data=
-            df_concorde_comparison.groupby(by=["description", "graph_size"]).mean().reset_index(), ax=ax)\
+            df_heuristics_comparison.groupby(by=["description", "graph_size"]).mean().reset_index(), ax=ax)\
             .set_title("Runtime comparison")
-        fig.savefig(figure_output_path / "concorde_runtime_comparison")
+        fig.savefig(figure_output_path / "Heuristics runtime comparison")
         plt.show()
