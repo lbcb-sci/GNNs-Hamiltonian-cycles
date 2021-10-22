@@ -8,6 +8,7 @@ Clone and run train.py to get the evaluation of "HamS" and "HamR" models present
 * [PyTorch](https://pytorch.org/) 1.8 or later
 * [PyTorch geometric](https://pytorch-geometric.readthedocs.io/en/latest/index.html) 1.6.3 or later
 * [Concorde TSP solver](http://www.math.uwaterloo.ca/tsp/concorde.html)
+* [Networkit](https://networkit.github.io/)
 
 ### Usage
 * Running train.py loads HamS and HamR models from WEIGHTS folder and evaluates them on graphs stored in DATA folder. Removing all .pt files from WEIGHTS folder will instead first train both HamS and HamR models.
