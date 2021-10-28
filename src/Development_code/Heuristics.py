@@ -50,6 +50,7 @@ def _rotational_options(g, path):
             rotational_options.append(path[:i + 1] + [path[j] for j in range(len(path) - 1, i, -1)])
     return rotational_options
 
+
 def _invert_path(path):
     return [path[i] for i in range(len(path) - 1, -1, -1)]
 
@@ -126,5 +127,3 @@ if __name__ == '__main__':
             nx_graph.add_edges_from(HybridHam_path_edges)
             nx.draw_networkx_edges(nx_graph, pos, edge_color="red", arrows=False, ax=ax2)
             plt.show()
-
-

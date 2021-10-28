@@ -19,6 +19,8 @@ from src.ExactSolvers import ConcordeHamiltonSolver
 from src.NN_modules import ResidualMultilayerMPNN
 from src.Development_code.Heuristics import least_degree_first_heuristics, HybridHam
 
+from src.Evaluation import EvaluationScores, EvaluationPlots
+
 
 def _time_operation_cpu(operation, dataset):
     total_time = 0
@@ -160,6 +162,55 @@ if __name__ == '__main__':
         HamS_model = EncodeProcessDecodeAlgorithm(True, processor_depth=5, hidden_dim=32, device=local_devices[0])
         HamS_processor_net = HamS_model.processor_nn
 
+        # accuracy_comparison_sizes = [20, 50, 100, 150, 200]
+        accuracy_comparison_sizes = [x for x in range(50, 400, 50)]
+        accuracy_nr_examples_per_size = 20
+        batch_size = 1
+        HamS_evaluations = []
+        least_degree_first_evaluation = []
+        HybridHam_evaluation = []
+
+        def _run_heuristic_on_batch_of_graphs(heuristic, batch: torch_g.data.Batch):
+            node_per_graph = batch.num_nodes // batch.num_graphs
+            tours = torch.full([batch.num_graphs, node_per_graph + 1], -1)
+            data_list = batch.to_data_list()
+            for data_index in range(len(data_list)):
+                d = data_list[data_index]
+                tour = heuristic(d.num_nodes, d.edge_index)
+                for node_index in range(len(tour)):
+                    tours[data_index, node_index] = tour[node_index]
+            return tours, torch.empty([1])
+
+        for s in accuracy_comparison_sizes:
+            graph_generator = ErdosRenyiGenerator(s, hamilton_existence_prob)
+            batch_generator = (
+                torch_g.data.Batch.from_data_list([next(iter(graph_generator)) for data_index in range(batch_size)])
+                for _ in itertools.count()
+            )
+            least_degree_first_evaluation.append(EvaluationScores.batch_evaluate(
+                lambda batch: _run_heuristic_on_batch_of_graphs(least_degree_first_heuristics, batch),
+                batch_generator, accuracy_nr_examples_per_size // batch_size
+            ))
+
+            HybridHam_evaluation.append(EvaluationScores.batch_evaluate(
+                lambda batch: _run_heuristic_on_batch_of_graphs(HybridHam, batch),
+                batch_generator, accuracy_nr_examples_per_size // batch_size
+            ))
+
+            # HamS_evaluations.append(EvaluationScores.batch_evaluate(
+            #     lambda d: HamS_model.batch_run_greedy_neighbor(d),
+            #     batch_generator, accuracy_nr_examples_per_size))
+
+        # HamS_accuracy_scores = EvaluationScores.compute_accuracy_scores(HamS_evaluations, accuracy_comparison_sizes)
+
+        for e in least_degree_first_evaluation + HybridHam_evaluation:
+            e["nr_hamilton_graphs"] = 1
+        EvaluationPlots.accuracy_curves(least_degree_first_evaluation, accuracy_comparison_sizes, best_expected_benchmark=0.8)
+        plt.show()
+        EvaluationPlots.accuracy_curves(HybridHam_evaluation, accuracy_comparison_sizes, best_expected_benchmark=0.8)
+        plt.show()
+        exit(-1)
+
         forward_pass_sizes = list(range(100, 1000, 100))
         df_forward_pass = compare_forward_step_across_devices(HamS_model, forward_pass_sizes, hamilton_existence_prob)
         fig, (ax1, ax2) = plt.subplots(1, 2)
@@ -187,11 +238,11 @@ if __name__ == '__main__':
         fig.savefig(figure_output_path / "component runtimes")
 
         runtime_comparison_sizes = [50, 100, 150, 250, 500, 1000, 2000, 4000, 8000]
-        nr_examples_per_size = 2
+        runtime_nr_examples_per_size = 2
         records = []
         for s in runtime_comparison_sizes:
             graph_generator = ErdosRenyiGenerator(s, hamilton_existence_prob)
-            for d in itertools.islice(graph_generator, nr_examples_per_size):
+            for d in itertools.islice(graph_generator, runtime_nr_examples_per_size):
                 HamS_runtime, [(HamS_path_tensor, HamS_probabilites)] = time_operation(
                     lambda a: HamS_model.batch_run_greedy_neighbor(a),
                     [torch_g.data.batch.Batch.from_data_list([d])], HamS_model.device)
@@ -222,4 +273,3 @@ if __name__ == '__main__':
             df_heuristics_comparison.groupby(by=["description", "graph_size"]).mean().reset_index(), ax=ax)\
             .set_title("Runtime comparison")
         fig.savefig(figure_output_path / "Heuristics runtime comparison")
-        plt.show()
