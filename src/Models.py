@@ -285,6 +285,12 @@ class EmbeddingAndMaxMPNN(HamiltonCycleFinderWithValueFunction):
         if is_load_weights:
             self.load_weights()
 
+    def to(self, device):
+        for module in [self.embedding, self.embedding_out_projection, self.processor, self.processor_out_projection]:
+            module.to(device)
+        self.initial_embedding = self.initial_embedding.to(device)
+        self.device = device
+
     def to_cuda(self):
         self.initial_embedding.to("cuda")
         for module in [self.embedding, self.embedding_out_projection, self.processor, self.processor_out_projection]:

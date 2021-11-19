@@ -8,7 +8,7 @@ import torch
 import torch_geometric as torch_g
 from matplotlib import pyplot as plt
 
-from src.Models import HamiltonianCycleFinder, DEVICE, HamiltonCycleFinderWithValueFunction
+from src.Models import HamiltonianCycleFinder, HamiltonCycleFinderWithValueFunction
 
 
 class TrainAlgorithm(ABC):
@@ -62,7 +62,7 @@ class SupervisedTrainFollowingHamiltonCycle(TrainAlgorithm):
         hamilton_nn.next_step_logits(d)
         hamilton_nn.prepare_for_first_step(d, teacher_paths[..., 0])
 
-        loss = torch.zeros(1, device=DEVICE)
+        loss = torch.zeros(1, device=hamilton_nn.get_device())
         for step in range(1, d.num_nodes // d.num_graphs + 1):
             if step > 1:
                 hamilton_nn.update_state(d, teacher_paths[..., step - 1])
