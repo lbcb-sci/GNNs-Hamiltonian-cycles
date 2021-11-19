@@ -1,5 +1,7 @@
 import itertools
 import matplotlib.pyplot as plt
+import pandas
+import numpy
 
 import torch
 import torch.utils.data
@@ -16,24 +18,22 @@ class EvaluationScores:
         perc_full_walks_found = "perc_full_walks_found"
         perc_long_walks_found = "perc_long_walks_found"
 
+    APPROXIMATE_HAMILTON_LOWER_BOUND = 0.9
+
     @staticmethod
     def __format_evaluation_scores_list(score):
-        x = torch.cat(score, dim=0)
-        return x[torch.nonzero(x).squeeze(-1)]
+        return torch.cat(score, dim=0).numpy()
 
     @staticmethod
     def verify_only_neighbor_connections(d: torch_g.data.Batch, batch_of_walks):
         walks = [[n.item() for n in batch_of_walks[i]] for i in range(batch_of_walks.shape[0])]
-        correct_termination = [not any([w[i] == -1 and w[i+1] != -1 for i in range(len(w) -1)]) for w in walks]
+        correct_termination = [not any([w[i] == -1 and w[i+1] != -1 for i in range(len(w) - 1)]) for w in walks]
         walks = [[n for n in t if n != -1] for t in walks]
 
-        neighbor_dict = {}
+        neighbor_dict = {x: [] for x in range(d.num_nodes)}
         for (x, y) in torch.t(d.edge_index):
             x, y = x.item(), y.item()
-            if x not in neighbor_dict:
-                neighbor_dict[x] = [y]
-            else:
-                neighbor_dict[x] += [y]
+            neighbor_dict[x].append(y)
 
         correct_walks = []
         for walk in walks:
@@ -49,79 +49,98 @@ class EvaluationScores:
         return torch.tensor(correct_walks, device=d.edge_index.device)
 
     @staticmethod
-    def batch_evaluate(compute_batch_of_walks_fn, batch_graph_generator, max_batches_to_generate):
-        cycle_scores = []
-        walk_scores = []
-        rel_cycle_len = []
-        rel_walk_len = []
+    def batch_evaluate(compute_batch_of_walks_fn, batch_graph_generator, max_batches_to_generate=None):
+        cycle_length = []
+        walk_length = []
+        illegal_step_made = []
+        sizes = []
 
-        with torch.no_grad():
-            for d in itertools.islice(batch_graph_generator, max_batches_to_generate):
-                walk, selection = compute_batch_of_walks_fn(d)
-                walk, selection = walk.detach(), selection.detach()
-                start_node_repeats = torch.isclose(walk, walk[..., 0][..., None])
-                is_using_proper_edges = EvaluationScores.verify_only_neighbor_connections(d, walk)
-                is_cycle = torch.ge(torch.sum(start_node_repeats, dim=-1), 2)
-                walk_len = torch.sum(torch.gt(walk, -0.5), dim=-1)
-                walk_len = walk_len - torch.ones_like(walk_len)*is_cycle
-                cycle_scores += [torch.flatten(is_cycle * walk_len)]
-                walk_scores += [torch.flatten(torch.logical_not(is_cycle) * walk_len)]
-                rel_cycle_len += [torch.flatten(
-                    is_using_proper_edges * is_cycle * walk_len
-                    / torch_scatter.scatter_sum(torch.ones_like(d.batch), d.batch, dim=-1, dim_size=d.num_graphs)
-                )]
-                rel_walk_len += [torch.flatten(
-                    is_using_proper_edges * torch.logical_not(is_cycle) * walk_len
-                    / torch_scatter.scatter_sum(torch.ones_like(d.batch), d.batch, dim=-1, dim_size=d.num_graphs)
-                )]
-            result = {name: EvaluationScores.__format_evaluation_scores_list(tensor_list)
-                      for name, tensor_list in zip(["cycle_scores", "walk_scores", "rel_cycle_len", "rel_walk_len"],
-                                                   [cycle_scores, walk_scores, rel_cycle_len, rel_walk_len])}
-        return result
+        for d in itertools.islice(batch_graph_generator, max_batches_to_generate):
+            walk, selection = compute_batch_of_walks_fn(d)
+            start_node_repeats = torch.isclose(walk, walk[..., 0][..., None])
+            is_no_illegal_edges_used = EvaluationScores.verify_only_neighbor_connections(d, walk)
+            is_cycle = torch.ge(torch.sum(start_node_repeats, dim=-1), 2)
+            walk_len = torch.sum(torch.gt(walk, -0.5), dim=-1)
+            walk_len = walk_len - torch.ones_like(walk_len) * is_cycle
+            walk_len = walk_len * is_no_illegal_edges_used
+            cycle_length.append(is_cycle * walk_len)
+            walk_length.append(torch.logical_not(is_cycle) * walk_len)
+            illegal_step_made.append(torch.logical_not(is_no_illegal_edges_used))
+            sizes.append(torch_scatter.scatter_sum(
+                torch.ones_like(d.batch), d.batch, dim=-1, dim_size=d.num_graphs))
+        return {name: EvaluationScores.__format_evaluation_scores_list(tensor_list)
+                  for name, tensor_list in zip(["cycle_score", "walk_score", "illegal_steps_made", "size"],
+                                               [cycle_length, walk_length, illegal_step_made, sizes])}
 
     @staticmethod
-    def compute_accuracy_scores(evals, sizes):
-        hamilton_perc = []
-        approx_hamilton_perc = []
-        full_walk_perc = []
-        long_walk_perc = []
-        perc_ham_graphs = []
+    def compute_accuracy_scores(evals):
+        df = pandas.DataFrame.from_dict(evals)
+        df["is_hamilton_cycle"] = (df["cycle_length"] == df["size"])
+        df["is_hamilton_path"] = (df["walk_length"] == df["size"])
+        df["is_approx_ham_cycle"] = (df["cycle_length"] > EvaluationScores.APPROXIMATE_HAMILTON_LOWER_BOUND * df["size"])
+        df["is_approx_ham_path"] = (df["walk_length"] > EvaluationScores.APPROXIMATE_HAMILTON_LOWER_BOUND * df["size"])
 
-        for e, s in zip(evals, sizes):
-            total_walks = len(e["rel_cycle_len"]) + len(e["rel_walk_len"])
-            for ham, limit in zip([hamilton_perc, approx_hamilton_perc], [0.999, 0.899]):
-                ham += [len([t for t in e["rel_cycle_len"] if t > limit])/total_walks]
-            for walk, limit in zip([full_walk_perc, long_walk_perc], [0.999, 0.899]):
-                walk += [len([t for t in e["rel_walk_len"] if t > limit])/total_walks]
-            perc_ham_graphs += [None if e["nr_hamilton_graphs"] is None else e["nr_hamilton_graphs"] / total_walks]
-        return hamilton_perc, approx_hamilton_perc, full_walk_perc, long_walk_perc, perc_ham_graphs
+        accuracy_columns = ["is_hamiltonian_cycle", "is_hamiltonian_path", "is_approx_ham_cycle", "is_approx_ham_path"]
+        grouped = df[["size"] + accuracy_columns].groupby("size").aggregate({name: "mean" for name in accuracy_columns})
+        return [grouped[col_name] for col_name in [["size"] + accuracy_columns]]
 
     @staticmethod
-    def evaluate_on_saved_data(nn_hamilton, nr_batches_per_size, data_folders=None):
+    def _filtered_generator(num_per_size, gen):
+        size_counter = {}
+        for (graph, ham_cycle) in gen:
+            if graph.num_nodes in size_counter:
+                size_counter[graph.num_nodes] += 1
+            else:
+                size_counter[graph.num_nodes] = 1
+            if size_counter[graph.num_nodes] > num_per_size:
+                continue
+            else:
+                yield (graph, ham_cycle)
+
+    @staticmethod
+    def evaluate_on_saved_data(nn_hamilton, nr_graphs_per_size=10, data_folders=None):
         if data_folders is None:
             data_folders = ["../DATA"]
-        size_dict = {}
-        generator = ErdosRenyiInMemoryDataset(data_folders)
-        for graph, hamilton_cycle in generator:
-            if graph.num_nodes in size_dict:
-                size_dict[graph.num_nodes] += [(graph, hamilton_cycle)]
-            else:
-                size_dict[graph.num_nodes] = [(graph, hamilton_cycle, hamilton_cycle)]
-        sizes = [s for s in sorted(list(size_dict.keys()))]
-        evals = []
-        batch_size = 10
 
-        for eval_size in sizes:
-            it = (torch_g.data.Batch.from_data_list([x[0] for x in size_dict[eval_size][index: index + batch_size]])
-                       for index in range(0, len(size_dict[eval_size]), batch_size))
-            print(f"Evaluating on {min(len(size_dict[eval_size]), nr_batches_per_size * batch_size)} graphs of"
-                  f" size {eval_size} saved in {data_folders}")
-            e = EvaluationScores.batch_evaluate(lambda g: nn_hamilton.batch_run_greedy_neighbor(g), it,
-                                                nr_batches_per_size)
-            e["nr_hamilton_graphs"] = len(
-                [data for data in itertools.islice(size_dict[eval_size], nr_batches_per_size * batch_size)
-                 if data[1] is not None and len(data[1]) > 0])
-            evals += [e]
+        def _get_generator():
+            gen = ErdosRenyiInMemoryDataset(data_folders)
+            if nr_graphs_per_size is not None:
+                gen = EvaluationScores._filtered_generator(nr_graphs_per_size, gen)
+            return gen
+
+        is_hamiltonian = numpy.array([x[1] is not None and len(x[1]) > 0 for x in _get_generator()])
+
+        generator = _get_generator()
+        batch_size = 10
+        batch_generator = (
+            torch_g.data.Batch.from_data_list([first[0]] + [d[0] for d in itertools.islice(generator, batch_size - 1)])
+            for first in generator)
+        evals = EvaluationScores.batch_evaluate(lambda g: nn_hamilton.batch_run_greedy_neighbor(g), batch_generator)
+        evals["is_graph_hamiltonian"] = is_hamiltonian
+        scores = EvaluationScores.compute_accuracy_scores(evals)
+
+        return evals, is_hamiltonian
+        #
+        # size_dict = {}
+        # for graph, hamilton_cycle in generator:
+        #     if graph.num_nodes in size_dict:
+        #         size_dict[graph.num_nodes] += [(graph, hamilton_cycle)]
+        #     else:
+        #         size_dict[graph.num_nodes] = [(graph, hamilton_cycle, hamilton_cycle)]
+        # sizes = [s for s in sorted(list(size_dict.keys()))]
+        # evals = []
+
+        # for eval_size in sizes:
+        #     it = (torch_g.data.Batch.from_data_list([x[0] for x in size_dict[eval_size][index: index + batch_size]])
+        #                for index in range(0, len(size_dict[eval_size]), batch_size))
+        #     print(f"Evaluating on {min(len(size_dict[eval_size]), nr_batches_per_size * batch_size)} graphs of"
+        #           f" size {eval_size} saved in {data_folders}")
+        #     e = EvaluationScores.batch_evaluate(lambda g: nn_hamilton.batch_run_greedy_neighbor(g), it,
+        #                                         nr_batches_per_size)
+        #     e["nr_hamilton_graphs"] = len(
+        #         [data for data in itertools.islice(size_dict[eval_size], nr_batches_per_size * batch_size)
+        #          if data[1] is not None and len(data[1]) > 0])
+        #     evals += [e]
         return evals, sizes
 
 
@@ -191,3 +210,7 @@ class EvaluationPlots:
         ax.set_ylim(0, 100)
         ax.legend(loc="upper right")
         return fig
+
+    @staticmethod
+    def model_performance(evals):
+        pass
