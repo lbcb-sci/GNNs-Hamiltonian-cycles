@@ -3,6 +3,7 @@ import os.path
 from abc import ABC, abstractmethod
 
 import torch
+import torch.nn.functional as F
 import torch_scatter
 import torch_geometric as torch_g
 import torchinfo
@@ -106,11 +107,16 @@ class HamiltonianCycleFinder(ABC):
         pass
 
     def _neighbor_prob_and_greedy_choice_for_batch(self, d: torch_g.data.Batch):
-        p = self.next_step_prob_masked_over_neighbors(d).reshape([d.num_graphs, -1])
+        p = self.next_step_prob_masked_over_neighbors(d)
+        graph_sizes = [g.num_nodes for g in d.to_data_list()]
+        max_size = max(graph_sizes)
+        p = torch.stack([F.pad(x, (0, max_size - x.shape[0]), "constant", -1) for x in torch.split(p, graph_sizes)])
+
         choice = torch.argmax(
             torch.isclose(p, torch.max(p, dim=-1)[0][..., None])
             * (p + torch.randperm(p.shape[-1], device=p.device)[None, ...]), dim=-1)
-        choice = choice + torch_scatter.scatter_sum(d.batch, d.batch, dim_size=d.num_graphs)
+        choice += torch.tensor([0] + graph_sizes[:-1])
+
         return p, choice
 
     def batch_run_greedy_neighbor(self, d: torch_g.data.Batch):
