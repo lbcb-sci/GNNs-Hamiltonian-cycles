@@ -32,11 +32,9 @@ def train_HamR(is_load_weights=False, train_epochs=1000):
 
 
 def evaluate_model(model, model_name):
-    evaluations, sizes = EvaluationScores.evaluate_on_saved_data(model, MAX_NR_BATCHES_TO_USE_FOR_EVALUATION,
+    evaluations = EvaluationScores.evaluate_model_on_saved_data(model, MAX_NR_BATCHES_TO_USE_FOR_EVALUATION,
                                                                  EVALUATION_DATA_FOLDERS)
-    hamilton_perc, approx_hamilton_perc, full_walk_perc, long_walk_perc, perc_ham_graphs \
-        = EvaluationScores.compute_accuracy_scores(evaluations, sizes)
-    return sizes, hamilton_perc
+    return EvaluationScores.compute_accuracy_scores(evaluations)
 
 
 if __name__ == '__main__':
@@ -62,7 +60,6 @@ if __name__ == '__main__':
         hamS_epochs = 0
         hamR_epochs = 0
 
-
     with mp.Pool(processes=2) as pool:
         HamS_train_result = pool.apply_async(train_HamS, (hamS_is_load_weights, hamS_epochs))
         HamR_train_result = pool.apply_async(train_HamR, (hamR_is_load_weights, hamR_epochs))
@@ -77,9 +74,8 @@ if __name__ == '__main__':
         HamR_evaluation_result.get()
 
         for name, result in [("Hams", HamS_evaluation_result), ("HamR", HamR_evaluation_result)]:
-            sizes, hamilton_perc = result.get()
+            scores = result.get()
             print(f"{name} evaluation {'successful.' if result.successful() else 'failed!'}")
-            if not result.successful():
-                continue
-            print(f"{name} found Hamiltonian cycles in on graphs of sizes {sizes} in following fractions:"
-                  f" {hamilton_perc}")
+            if result.successful():
+                print(f"{name} found Hamiltonian cycles in on graphs of sizes"
+                      f" {[x for x in scores['size']]} in following fractions: {[x for x in scores['perc_ham_cycle']]}")

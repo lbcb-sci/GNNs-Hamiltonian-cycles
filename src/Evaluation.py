@@ -59,16 +59,17 @@ class EvaluationScores:
     @staticmethod
     def compute_accuracy_scores(evals):
         df = pandas.DataFrame.from_dict(evals)
-        df["is_hamilton_cycle"] = (df["length"] == df["size"]) & (df["is_cycle"])
-        df["is_hamilton_path"] = (df["walk_length"] == df["size"]) & (~df["is_cycle"])
+        df["is_ham_cycle"] = (df["length"] == df["size"]) & (df["is_cycle"])
+        df["is_ham_path"] = (df["length"] == df["size"]) & (~df["is_cycle"])
         df["is_approx_ham_cycle"] \
-            = (df["cycle_length"] > EvaluationScores.APPROXIMATE_HAMILTON_LOWER_BOUND * df["size"]) & (df["is_cycle"])
-        df["sis_approx_ham_path"] \
-            = (df["walk_length"] > EvaluationScores.APPROXIMATE_HAMILTON_LOWER_BOUND * df["size"]) & (~df["is_cycle"])
+            = (df["length"] > EvaluationScores.APPROXIMATE_HAMILTON_LOWER_BOUND * df["size"]) & (df["is_cycle"])
+        df["is_approx_ham_path"] \
+            = (df["length"] > EvaluationScores.APPROXIMATE_HAMILTON_LOWER_BOUND * df["size"]) & (~df["is_cycle"])
 
-        accuracy_columns = ["is_hamiltonian_cycle", "is_hamiltonian_path", "is_approx_ham_cycle", "is_approx_ham_path"]
-        grouped = df[["size"] + accuracy_columns].groupby("size").aggregate({name: "mean" for name in accuracy_columns})
-        return [grouped[col_name] for col_name in [["size"] + accuracy_columns]]
+        measurement_columns = ["is_ham_cycle", "is_ham_path", "is_approx_ham_cycle", "is_approx_ham_path"]
+        grouped = df[["size"] + measurement_columns].groupby("size").aggregate({name: "sum" for name in measurement_columns}).reset_index()
+        grouped.columns = [col.replace("is_", "perc_") for col in grouped]
+        return grouped
 
     @staticmethod
     def _filtered_generator(num_per_size, gen):
@@ -98,8 +99,7 @@ class EvaluationScores:
 
         evals = EvaluationScores.evaluate(compute_walks_from_graph_list_fn, _get_generator())
         evals["is_graph_hamiltonian"] = is_hamiltonian
-        scores = EvaluationScores.compute_accuracy_scores(evals)
-        return scores
+        return evals
 
     @staticmethod
     def evaluate_model_on_saved_data(nn_hamilton: HamiltonianCycleFinder, nr_graphs_per_size=10, data_folders=None):
