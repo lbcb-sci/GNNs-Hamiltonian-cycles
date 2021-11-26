@@ -14,7 +14,7 @@ import torch_geometric as torch_g
 import torch_scatter
 
 from src.DatasetBuilder import ErdosRenyiInMemoryDataset, ErdosRenyiGenerator
-from src.Models import GatedGCNEmbedAndProcess, HamiltonianCycleFinder, EncodeProcessDecodeAlgorithm
+from src.Models import GatedGCNEmbedAndProcess, HamFinderGNN, EncodeProcessDecodeAlgorithm
 from src.ExactSolvers import ConcordeHamiltonSolver
 from src.NN_modules import ResidualMultilayerMPNN
 from src.Development_code.Heuristics import least_degree_first_heuristics, HybridHam
@@ -68,13 +68,13 @@ def time_operation(operation, dataset, device):
 #     return timings
 
 
-def operation_forward_step(model: HamiltonianCycleFinder, d: torch_g.data.Batch):
+def operation_forward_step(model: HamFinderGNN, d: torch_g.data.Batch):
     model.init_graph(d)
     model.prepare_for_first_step(d, torch.tensor([0], device=d.edge_index.device))
     return model.next_step_prob_masked_over_neighbors(d)
 
 
-def profile_data_preparation(model: HamiltonianCycleFinder, d: torch_g.data.Batch):
+def profile_data_preparation(model: HamFinderGNN, d: torch_g.data.Batch):
     times = {}
     times["data_init"], _ = time_operation(lambda a: model.init_graph(a), [d], model.device)
     times["data_prep"], _ = time_operation(lambda a: model.prepare_for_first_step(a, [0]), [d], model.device)

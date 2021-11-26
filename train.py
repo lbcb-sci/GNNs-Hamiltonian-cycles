@@ -60,6 +60,11 @@ if __name__ == '__main__':
         hamS_epochs = 0
         hamR_epochs = 0
 
+    # HamS_model = train_HamS(hamS_is_load_weights, hamS_epochs)
+    # HamR_model = train_HamR(hamR_is_load_weights, hamR_epochs)
+    # HamS_evaluation_result = evaluate_model(HamS_model, "HamS")
+    # HamR_evaluation_result = evaluate_model(HamR_model, "HamR")
+
     with mp.Pool(processes=2) as pool:
         HamS_train_result = pool.apply_async(train_HamS, (hamS_is_load_weights, hamS_epochs))
         HamR_train_result = pool.apply_async(train_HamR, (hamR_is_load_weights, hamR_epochs))
@@ -70,7 +75,7 @@ if __name__ == '__main__':
 
         HamS_evaluation_result = pool.apply_async(evaluate_model, (HamS_model, "HamS"))
         HamR_evaluation_result = pool.apply_async(evaluate_model, (HamR_model, "HamR"))
-        HamR_evaluation_result.get()
+        HamS_evaluation_result.get()
         HamR_evaluation_result.get()
 
         for name, result in [("Hams", HamS_evaluation_result), ("HamR", HamR_evaluation_result)]:

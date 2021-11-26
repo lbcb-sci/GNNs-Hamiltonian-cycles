@@ -2,8 +2,15 @@ import networkx as nx
 import torch_geometric as torch_g
 from matplotlib import pyplot as plt
 from matplotlib import cm
-from src.Models import HamiltonianCycleFinder
+from typing import List
+import pandas
+import seaborn
+from matplotlib import pyplot
+
+from src.Models import HamFinderGNN, HamFinder
 from src.VisualisationTools import display_result_on_known_hamilton_graphs
+from src.Evaluation import EvaluationScores
+from src.Development_code.Heuristics import HybridHam, LeastDegreeFirstHeuristics
 
 
 def display_decisions_step_by_step(d: torch_g.data.Data, tour, selection):
@@ -33,36 +40,31 @@ def display_decisions_step_by_step(d: torch_g.data.Data, tour, selection):
     return tour
 
 
-def visualize_nn_performance_on_saved_data(hamilton_nn: HamiltonianCycleFinder, data_directories):
-    from src.DatasetBuilder import ErdosRenyiInMemoryDataset
-    from src.Evaluation import EvaluationScores
-    dataset = ErdosRenyiInMemoryDataset(data_directories)
-    for d, hamilton_cylce in dataset:
-        if len(hamilton_cylce) != d.num_nodes:
-            continue
-        if d.num_nodes < 30 or d.num_nodes > 50:
-            continue
-        # nn_path = hamilton_nn.run_greedy_neighbor(d)[0]
-        b = torch_g.data.Batch.from_data_list([d])
-        nn_path = hamilton_nn.batch_run_greedy_neighbor(b)[0]
-        valid = EvaluationScores.verify_only_neighbor_connections(b, nn_path)
-        print(valid)
-        nn_path = [x.item() for x in nn_path.flatten()]
+def visualize_nn_performance_on_saved_data(hamilton_solvers: List[HamFinder], solver_names, data_dir=None):
+    scores_list = []
+    for solver, name in zip(hamilton_solvers, solver_names):
+        evals = EvaluationScores.evaluate_on_saved_data(solver.solve_graphs, nr_graphs_per_size=None, data_folders=data_dir)
+        scores = EvaluationScores.compute_accuracy_scores(evals)
+        scores["solver_name"] = name
+        scores_list.append(scores)
+    df_scores = pandas.concat(scores_list).reset_index(drop=True)
+    combined = []
+    for accuracy_col in [c for c in df_scores.columns if c.startswith("perc")]:
+        partial_df = df_scores[["size", "solver_name", accuracy_col]].copy()
+        partial_df.columns = [c if c != accuracy_col else "perc_score" for c in partial_df.columns]
+        partial_df["score_type"] = accuracy_col
+        combined.append(partial_df)
+    
+    df_scores = pandas.concat(combined, ignore_index=True)
+    seaborn.FacetGrid(data=df_scores, col="score_type").map_dataframe(seaborn.lineplot, x="size", y="perc_score", hue="solver_name")
+    plt.show()
 
-        # print(hamilton_cylce)
-        # g = torch_g.utils.to_networkx(d)
-        # nx.draw(g, with_labels=True)
-        # plt.show()
-        # continue
 
-        start = nn_path[0]
-        start_pos = hamilton_cylce.index(start)
-        tmp_ham = hamilton_cylce[start_pos:] + hamilton_cylce[:start_pos]
-        fig = display_result_on_known_hamilton_graphs(d, tmp_ham, tmp_ham)
-        fig.show()
-        plt.show()
-
-        fig = display_result_on_known_hamilton_graphs(d, nn_path, hamilton_cylce)
-        fig.show()
-        plt.show()
-    return
+if __name__ == '__main__':
+    from train import train_HamS
+    HamS_model = train_HamS(True, 0)
+    hybrid_ham_heuristics = HybridHam()
+    least_degree_first = LeastDegreeFirstHeuristics()
+    visualize_nn_performance_on_saved_data(
+        [HamS_model, hybrid_ham_heuristics, least_degree_first],
+        ["HamS", "HybridHam", "Least_degree_first"], )

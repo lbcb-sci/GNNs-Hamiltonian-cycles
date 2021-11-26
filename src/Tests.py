@@ -26,7 +26,7 @@ def test_limiting_prob(graphs_directory):
     print(sizes)
 
 
-def test_model_on_dataset(nn_hamilton: Models.HamiltonianCycleFinder, data_directories):
+def test_model_on_dataset(nn_hamilton: Models.HamFinderGNN, data_directories):
     from src.Evaluation import EvaluationScores
     evals, sizes = EvaluationScores.evaluate_on_saved_data(nn_hamilton, 5000, data_directories)
     hamilton_perc, approx_hamilton_perc, full_walk_perc, long_walk_perc, perc_ham_graphs\

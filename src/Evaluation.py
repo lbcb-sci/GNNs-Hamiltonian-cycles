@@ -1,14 +1,15 @@
-import itertools
 import matplotlib.pyplot as plt
 import pandas
 import numpy
+from typing import List
 
 import torch
 import torch.utils.data
 import torch_geometric as torch_g
 
 from src.DatasetBuilder import ErdosRenyiInMemoryDataset
-from src.Models import HamiltonianCycleFinder
+from src.Models import HamFinderGNN
+from src.constants import *
 
 
 class EvaluationScores:
@@ -38,21 +39,12 @@ class EvaluationScores:
         return True
 
     @staticmethod
-    def evaluate(compute_walks_from_graph_list_fn, graph_generator, batch_size=8):
-        batch_generator = ([first[0]] + [d[0] for d in itertools.islice(graph_generator, batch_size - 1)]
-                           for first in graph_generator)
-        is_cycle = []
-        is_valid = []
-        nr_unique_nodes = []
-        sizes = []
-
-        for graph_list in batch_generator:
-            walks = compute_walks_from_graph_list_fn(graph_list)
-            for g, w in zip(graph_list, walks):
-                is_valid.append(not EvaluationScores.is_walk_valid(g, w))
-                is_cycle.append(w[0] == w[-1])
-                nr_unique_nodes.append(len(set(w)))
-                sizes.append(g.num_nodes)
+    def evaluate(solve_graphs, graph_list: List[torch_g.data.Data]):
+        walks = solve_graphs(g for g in graph_list)
+        is_valid = [not EvaluationScores.is_walk_valid(graph, walk) for graph, walk in zip(graph_list, walks)]
+        is_cycle = [walk[0] == walk[-1] for walk in walks]
+        nr_unique_nodes = [len(set(walk)) for walk in walks]
+        sizes = [graph.num_nodes for graph in graph_list]
 
         return {"is_cycle": is_cycle, "is_valid": is_valid, "length": nr_unique_nodes, "size": sizes}
 
@@ -67,7 +59,7 @@ class EvaluationScores:
             = (df["length"] > EvaluationScores.APPROXIMATE_HAMILTON_LOWER_BOUND * df["size"]) & (~df["is_cycle"])
 
         measurement_columns = ["is_ham_cycle", "is_ham_path", "is_approx_ham_cycle", "is_approx_ham_path"]
-        grouped = df[["size"] + measurement_columns].groupby("size").aggregate({name: "sum" for name in measurement_columns}).reset_index()
+        grouped = df[["size"] + measurement_columns].groupby("size").aggregate({name: "mean" for name in measurement_columns}).reset_index()
         grouped.columns = [col.replace("is_", "perc_") for col in grouped]
         return grouped
 
@@ -87,7 +79,7 @@ class EvaluationScores:
     @staticmethod
     def evaluate_on_saved_data(compute_walks_from_graph_list_fn, nr_graphs_per_size=10, data_folders=None):
         if data_folders is None:
-            data_folders = ["../DATA"]
+            data_folders = EVALUATION_DATA_FOLDERS
 
         def _get_generator():
             gen = ErdosRenyiInMemoryDataset(data_folders)
@@ -97,22 +89,15 @@ class EvaluationScores:
 
         is_hamiltonian = numpy.array([x[1] is not None and len(x[1]) > 0 for x in _get_generator()])
 
-        evals = EvaluationScores.evaluate(compute_walks_from_graph_list_fn, _get_generator())
+        graph_list = [graph for graph, ham_cycle in _get_generator()]
+        evals = EvaluationScores.evaluate(compute_walks_from_graph_list_fn, graph_list)
         evals["is_graph_hamiltonian"] = is_hamiltonian
         return evals
 
     @staticmethod
-    def evaluate_model_on_saved_data(nn_hamilton: HamiltonianCycleFinder, nr_graphs_per_size=10, data_folders=None):
+    def evaluate_model_on_saved_data(nn_hamilton: HamFinderGNN, nr_graphs_per_size=10, data_folders=None):
         def _compute_walks_from_graph_list_fn(graph_list):
-            batch_data = torch_g.data.Batch.from_data_list(graph_list)
-            walks_tensor, _ = nn_hamilton.batch_run_greedy_neighbor(batch_data)
-            walks = [[int(node.item()) for node in walk] for walk in walks_tensor]
-            for walk in walks:
-                try:
-                    del walk[:walk.index(-1)]
-                except IndexError:
-                    pass
-            return walks
+            return nn_hamilton.solve_graphs(graph_list)
 
         return EvaluationScores.evaluate_on_saved_data(_compute_walks_from_graph_list_fn, nr_graphs_per_size, data_folders)
 

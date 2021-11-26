@@ -1,15 +1,15 @@
 import torch
 import torch_geometric as torch_g
 
-from src.Models import HamiltonianCycleFinder, HamiltonCycleFinderWithValueFunction
+from src.Models import HamFinderGNN, HamCycleFinderWithValueFunction
 from src.Trainers import SupervisedTrainFollowingHamiltonCycle, REINFORCE_WithLearnableBaseline
 
 
 class NeighborMaskedSupervisedTrainFollowingHamiltonCycle(SupervisedTrainFollowingHamiltonCycle):
-    def _get_next_step_probabilities(self, hamilton_nn: HamiltonianCycleFinder, d: torch_g.data.Batch):
+    def _get_next_step_probabilities(self, hamilton_nn: HamFinderGNN, d: torch_g.data.Batch):
         return hamilton_nn.next_step_prob_masked_over_neighbors(d)
 
-    def _get_next_step_logits(self, hamilton_nn: HamiltonianCycleFinder, d: torch_g.data.Batch):
+    def _get_next_step_logits(self, hamilton_nn: HamFinderGNN, d: torch_g.data.Batch):
         return hamilton_nn.next_step_logits_masked_over_neighbors(d)
 
     def train_description(self) -> str:
@@ -17,7 +17,7 @@ class NeighborMaskedSupervisedTrainFollowingHamiltonCycle(SupervisedTrainFollowi
 
 
 class REINFOCE_With_Averaged_simulations(REINFORCE_WithLearnableBaseline):
-    def _run_episode(self, nn_hamilton: HamiltonCycleFinderWithValueFunction, optimizer,
+    def _run_episode(self, nn_hamilton: HamCycleFinderWithValueFunction, optimizer,
                      original_graph: torch_g.data.Data, scorer):
         episode_d = original_graph.clone()
         with torch.no_grad():

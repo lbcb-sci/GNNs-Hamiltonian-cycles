@@ -1,6 +1,7 @@
 import itertools
 import os.path
 from abc import ABC, abstractmethod
+from typing import List
 
 import torch
 import torch.nn.functional as F
@@ -33,7 +34,13 @@ class WalkUpdater:
         d.x[current_nodes, 2] = 1
 
 
-class HamiltonianCycleFinder(ABC):
+class HamFinder(ABC):
+    @abstractmethod
+    def solve_graphs(self, graphs: List[torch_g.data.Data]) -> List[int]:
+        pass
+
+
+class HamFinderGNN(HamFinder):
     def __init__(self, graph_updater: WalkUpdater):
         self.graph_updater = graph_updater
 
@@ -56,7 +63,7 @@ class HamiltonianCycleFinder(ABC):
 
     @staticmethod
     def _mask_neighbor_logits(logits, d: torch_g.data.Data):
-        valid_next_step_indices = torch.nonzero(HamiltonianCycleFinder._neighbor_mask(d)).squeeze(-1)
+        valid_next_step_indices = torch.nonzero(HamFinderGNN._neighbor_mask(d)).squeeze(-1)
         neighbor_logits = torch.zeros_like(logits).log()
         neighbor_logits[valid_next_step_indices] = logits.index_select(0, valid_next_step_indices)
         return neighbor_logits
@@ -158,14 +165,36 @@ class HamiltonianCycleFinder(ABC):
 
             return walk, selections
 
+    def get_batch_size_for_multi_solving(self):
+        return 8
 
-class HamiltonCycleFinderWithValueFunction(HamiltonianCycleFinder):
+    def solve_graphs(self, graph_generator):
+        batch_size = self.get_batch_size_for_multi_solving()
+        batch_generator = ([first] + [d for d in itertools.islice(graph_generator, batch_size - 1)]
+                           for first in graph_generator)
+
+        walks = []
+        for batch in batch_generator:
+            data = torch_g.data.Batch.from_data_list(batch)
+            walks_tensor, _ = self.batch_run_greedy_neighbor(data)
+            new_walks = [[int(node.item()) for node in walk] for walk in walks_tensor]
+            for walk in new_walks:
+                try:
+                    del walk[:walk.index(-1)]
+                except IndexError:
+                    pass
+            walks = walks + new_walks
+        return walks
+
+
+
+class HamCycleFinderWithValueFunction(HamFinderGNN):
     @abstractmethod
     def next_step_logits_and_value_function(self, d:torch_g.data.Data) -> [torch.Tensor, torch.Tensor]:
         pass
 
 
-class EncodeProcessDecodeAlgorithm(HamiltonianCycleFinder):
+class EncodeProcessDecodeAlgorithm(HamFinderGNN):
     def _construct_processor(self):
         return ResidualMultilayerMPNN(dim=self.hidden_dim, message_dim=self.hidden_dim, edges_dim=1,
                                       nr_layers=self.processor_depth)
@@ -256,7 +285,7 @@ class EncodeProcessDecodeAlgorithm(HamiltonianCycleFinder):
         torch.save(self.initial_h, initial_hidden_path)
 
 
-class EmbeddingAndMaxMPNN(HamiltonCycleFinderWithValueFunction):
+class EmbeddingAndMaxMPNN(HamCycleFinderWithValueFunction):
     def _construct_embedding(self):
         embedding = ResidualMultilayerMPNN(self.hidden_dim, self.hidden_dim, 1, nr_layers=self.embedding_depth)
         embedding_out_projection = torch.nn.Linear(self.hidden_dim, self.hidden_dim - 3)
@@ -320,7 +349,7 @@ class EmbeddingAndMaxMPNN(HamiltonCycleFinderWithValueFunction):
         logits = result[..., 0]
         value_estimate = torch.max(result[..., 1], -1)[0]
         if d.x[..., 0].any():
-            return HamiltonianCycleFinder._mask_neighbor_logits(logits, d), value_estimate
+            return HamFinderGNN._mask_neighbor_logits(logits, d), value_estimate
         else:
             return logits, value_estimate
 

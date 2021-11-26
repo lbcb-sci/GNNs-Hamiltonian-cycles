@@ -8,7 +8,7 @@ import torch
 import torch_geometric as torch_g
 from matplotlib import pyplot as plt
 
-from src.Models import HamiltonianCycleFinder, HamiltonCycleFinderWithValueFunction
+from src.Models import HamFinderGNN, HamCycleFinderWithValueFunction
 
 
 class TrainAlgorithm(ABC):
@@ -47,13 +47,13 @@ class SupervisedTrainFollowingHamiltonCycle(TrainAlgorithm):
         self.learning_rate_decrease_factor = learning_rate_decrease_factor
         self.terminating_learning_rate = terminating_learning_rate
 
-    def _get_next_step_logits(self, hamilton_nn: HamiltonianCycleFinder, d: torch_g.data.Batch):
+    def _get_next_step_logits(self, hamilton_nn: HamFinderGNN, d: torch_g.data.Batch):
         return hamilton_nn.next_step_logits(d)
 
-    def _get_next_step_probabilities(self, hamilton_nn: HamiltonianCycleFinder, d: torch_g.data.Batch):
+    def _get_next_step_probabilities(self, hamilton_nn: HamFinderGNN, d: torch_g.data.Batch):
         return hamilton_nn.next_step_prob(d)
 
-    def _compute_loss(self, d, teacher_paths, teacher_distributions, hamilton_nn: HamiltonianCycleFinder):
+    def _compute_loss(self, d, teacher_paths, teacher_distributions, hamilton_nn: HamFinderGNN):
         assert teacher_paths is not None
         d = d.to(hamilton_nn.get_device())
         teacher_paths = teacher_paths.to(hamilton_nn.get_device())
@@ -81,7 +81,7 @@ class SupervisedTrainFollowingHamiltonCycle(TrainAlgorithm):
                 loss = None
         return loss
 
-    def _non_measured_train(self, graph_generator, hamilton_nn: HamiltonianCycleFinder, optimizer):
+    def _non_measured_train(self, graph_generator, hamilton_nn: HamFinderGNN, optimizer):
         history = {"epoch": [], "epoch_max": [], "epoch_avg": [], "avg_l2_parameters": []}
         graph_it = iter(graph_generator)
         learn_rate_decay_delay = self.learning_rate_decrease_condition_window
@@ -167,7 +167,7 @@ class CombinatorialScorer(ReinforcementScorer):
         x = d.x.reshape([d.num_graphs, -1, 3])
 
         choices_mask = torch.zeros_like(d.x[..., 2]).scatter_(0, choices, 1).reshape([d.num_graphs, -1])
-        valid_next_steps_mask = HamiltonianCycleFinder._neighbor_mask(d).reshape([d.num_graphs, -1])
+        valid_next_steps_mask = HamFinderGNN._neighbor_mask(d).reshape([d.num_graphs, -1])
         illegal_next_step_mask = torch.logical_not(torch.minimum(valid_next_steps_mask, choices_mask).any())
 
         cycle_mask = torch.minimum(x[..., 0], choices_mask).any(dim=-1)
@@ -197,7 +197,7 @@ class REINFORCE_WithLearnableBaseline(TrainAlgorithm):
     def create_simulation_batch(self, d):
         return torch_g.data.Batch.from_data_list(self.simulation_batch_size * [d])
 
-    def _batch_simulate(self, d: torch_g.data.Data, nn_hamilton: HamiltonianCycleFinder, scorer):
+    def _batch_simulate(self, d: torch_g.data.Data, nn_hamilton: HamFinderGNN, scorer):
         max_simulation_steps = self.max_simulation_steps
         if max_simulation_steps is None:
             max_simulation_steps = d.num_nodes
@@ -235,7 +235,7 @@ class REINFORCE_WithLearnableBaseline(TrainAlgorithm):
         total_loss = REINFORCE_loss + self.l2_regularization_weight * l2_params + self.value_function_weight * value_estimate_loss
         return total_loss
 
-    def _run_episode(self, nn_hamilton: HamiltonCycleFinderWithValueFunction,
+    def _run_episode(self, nn_hamilton: HamCycleFinderWithValueFunction,
                      optimizer, original_graph: torch_g.data.Data, scorer):
         d = original_graph.clone()
         nn_hamilton.init_graph(d)
@@ -263,7 +263,7 @@ class REINFORCE_WithLearnableBaseline(TrainAlgorithm):
         min_reward = torch.min(rewards_batches[0]).item()
         return avg_reward, min_reward, avg_lookahead
 
-    def _non_measured_train(self, generator, nn_hamilton: HamiltonCycleFinderWithValueFunction, optimizer):
+    def _non_measured_train(self, generator, nn_hamilton: HamCycleFinderWithValueFunction, optimizer):
         history = {"epoch": [], "epoch_max": [], "epoch_avg": [], "l2_parameters": []}
         epoch = 0
         it = iter(generator)

@@ -3,6 +3,7 @@ import networkx as nx
 import torch
 from copy import deepcopy
 
+from src.Models import HamFinder
 
 def _to_networkit(num_nodes, edge_index: torch.tensor):
     g = networkit.Graph(num_nodes)
@@ -54,49 +55,56 @@ def _rotational_options(g, path):
 def _invert_path(path):
     return [path[i] for i in range(len(path) - 1, -1, -1)]
 
+class LeastDegreeFirstHeuristics(HamFinder):
+    def solve_graphs(self, graphs):
+        return [least_degree_first_heuristics(graph.num_nodes, graph.edge_index, True) for graph in graphs] 
 
-def HybridHam(num_nodes, edge_index: torch.tensor):
-    g = _to_networkit(num_nodes, edge_index)
-    max_degree = networkit.graphtools.maxDegree(g)
-    start_options = [x for x in g.iterNodes() if g.degree(x) == max_degree]
-    initial_paths = []
-    for start_node in start_options:
-        initial_paths.append(_least_degree_first(g, start_node, True))
-    path = max(initial_paths, key=len)
+class HybridHam(HamFinder):
+    def solve_graphs(self, graphs):
+        return [self._solve(graph.num_nodes, graph.edge_index) for graph in graphs]
 
-    if len(path) <= 2:
-        return path
+    def _solve(self, num_nodes, edge_index: torch.tensor):
+        g = _to_networkit(num_nodes, edge_index)
+        max_degree = networkit.graphtools.maxDegree(g)
+        start_options = [x for x in g.iterNodes() if g.degree(x) == max_degree]
+        initial_paths = []
+        for start_node in start_options:
+            initial_paths.append(_least_degree_first(g, start_node, True))
+        path = max(initial_paths, key=len)
 
-    while len(path) < num_nodes:
-        if g.degree(path[0]) > g.degree(path[-1]):
-            path = _invert_path(path)
-        rotational_options = _rotational_options(g, path)
-        if rotational_options:
-            reduced_graph = deepcopy(g)
-            for edge in g.iterEdges():
-                if edge[0] in path or edge[1] in path:
-                    reduced_graph.removeEdge(*edge)
-            extension_options = [p for p in rotational_options if reduced_graph.degree(p[-1]) > 0]
-            if not extension_options:
-                return path
-            path = max(extension_options, key=lambda p: reduced_graph.degree(p[-1]))
-            path = path + _least_degree_first(reduced_graph, path[-1])
-        else:
+        if len(path) <= 2:
             return path
 
-    if g.hasEdge(path[0], path[-1]):
-        path.append(path[0])
+        while len(path) < num_nodes:
+            if g.degree(path[0]) > g.degree(path[-1]):
+                path = _invert_path(path)
+            rotational_options = _rotational_options(g, path)
+            if rotational_options:
+                reduced_graph = deepcopy(g)
+                for edge in g.iterEdges():
+                    if edge[0] in path or edge[1] in path:
+                        reduced_graph.removeEdge(*edge)
+                extension_options = [p for p in rotational_options if reduced_graph.degree(p[-1]) > 0]
+                if not extension_options:
+                    return path
+                path = max(extension_options, key=lambda p: reduced_graph.degree(p[-1]))
+                path = path + _least_degree_first(reduced_graph, path[-1])
+            else:
+                return path
+
+        if g.hasEdge(path[0], path[-1]):
+            path.append(path[0])
+            return path
+
+        if g.degree(path[0]) < g.degree(path[-1]):
+            path = _invert_path(path)
+
+        rotational_options = _rotational_options(g, path)
+        for option in rotational_options:
+            if g.hasEdge(option[0], option[-1]):
+                option = option.append(option[0])
+                return option
         return path
-
-    if g.degree(path[0]) < g.degree(path[-1]):
-        path = _invert_path(path)
-
-    rotational_options = _rotational_options(g, path)
-    for option in rotational_options:
-        if g.hasEdge(option[0], option[-1]):
-            option = option.append(option[0])
-            return option
-    return path
 
 
 if __name__ == '__main__':
