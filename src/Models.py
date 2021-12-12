@@ -1,9 +1,12 @@
 import itertools
+from os import walk
 import os.path
 from abc import ABC, abstractmethod
 from typing import List
+import numpy
 
 import torch
+from torch._C import Value
 import torch.nn.functional as F
 import torch_scatter
 import torch_geometric as torch_g
@@ -122,48 +125,44 @@ class HamFinderGNN(HamFinder):
         choice = torch.argmax(
             torch.isclose(p, torch.max(p, dim=-1)[0][..., None])
             * (p + torch.randperm(p.shape[-1], device=p.device)[None, ...]), dim=-1)
-        choice += torch.tensor([0] + graph_sizes[:-1])
+        choice += torch.tensor(list(itertools.accumulate(graph_sizes[:-1], initial=0)))
 
         return p, choice
 
-    def batch_run_greedy_neighbor(self, d: torch_g.data.Batch):
+    def batch_run_greedy_neighbor(self, batch_data: torch_g.data.Batch):
         with torch.no_grad():
-            self.init_graph(d)
+            nodes_per_graph = [d.num_nodes for d in batch_data.to_data_list()]
+            max_steps_in_a_cycle = max(nodes_per_graph) + 1
 
-            self.prepare_for_first_step(d, None)
-            p, choice = self._neighbor_prob_and_greedy_choice_for_batch(d)
-            selections = torch.unsqueeze(p, dim=-2)
-            walk = torch.unsqueeze(choice, dim=-1)
-            nodes_per_graph = d.num_nodes // d.num_graphs
+            self.init_graph(batch_data)
+            all_choices, all_scores = [], []
+            choice = None
+            stop_algorithm_mask = torch.zeros([batch_data.num_graphs], device=batch_data.edge_index.device, dtype=torch.uint8)
 
-            stop_algorithm_mask = torch.zeros_like(choice, dtype=torch.uint8)
-            for step in range(1, nodes_per_graph + 1):
-                if step == 1:
-                    self.prepare_for_first_step(d, choice)
+            for step in range(0, max_steps_in_a_cycle):
+                if step < 2:
+                    self.prepare_for_first_step(batch_data, choice)
                 else:
-                    current_nodes = walk[..., step - 1]
-                    self.update_state(d, current_nodes[current_nodes != -1])
-                p, choice = self._neighbor_prob_and_greedy_choice_for_batch(d)
-                choice = torch.logical_not(stop_algorithm_mask) * choice \
-                         - stop_algorithm_mask * torch.ones_like(choice)
-                stop_algorithm_mask = torch.maximum(stop_algorithm_mask,
-                                                    torch.any(torch.eq(walk, choice[..., None]), dim=-1))
-
-                walk = torch.cat([walk, choice.unsqueeze(dim=-1)], dim=-1)
-                selections = torch.cat(
-                    [selections, torch.unsqueeze(p * torch.logical_not(stop_algorithm_mask)[..., None]
-                                                 - stop_algorithm_mask[..., None], dim=-2)], dim=-2)
+                    current_nodes = choice
+                    self.update_state(batch_data, current_nodes[current_nodes != -1])
+                p, choice = self._neighbor_prob_and_greedy_choice_for_batch(batch_data)
+                choice = torch.logical_not(stop_algorithm_mask) * choice - stop_algorithm_mask
+                p = p * torch.logical_not(stop_algorithm_mask)[..., None]- stop_algorithm_mask[..., None]
+                if len(all_choices) > 0:
+                    stop_algorithm_mask = torch.maximum(
+                        stop_algorithm_mask, torch.any(torch.stack([torch.eq(x, choice) for x in all_choices])))
+                all_choices.append(choice)
+                all_scores.append(p)
 
                 if torch.all(stop_algorithm_mask).item():
-                    walk = torch.cat([walk, -1 * torch.ones([walk.shape[0], nodes_per_graph - step], dtype=walk.dtype,
-                                                            device=walk.device)], dim=-1)
-                    selections = torch.cat(
-                        [selections, -1 * torch.ones(
-                            selections.shape[0],nodes_per_graph - step, selections.shape[2], device=selections.device)],
-                        dim=-2)
                     break
-
-            return walk, selections
+            walks = torch.stack(all_choices, -1)
+            selections = torch.stack(all_scores, -2)
+            if walks.shape[-1] != max_steps_in_a_cycle:
+                walks = F.pad(walks, (0, max_steps_in_a_cycle - walks.shape[-1]), value=-1)
+            if selections.shape[-2] != max_steps_in_a_cycle: 
+                selections = F.pad(selections, (0, 0, 0, max_steps_in_a_cycle - selections.shape[-2]), value=-1)
+            return walks, selections
 
     def get_batch_size_for_multi_solving(self):
         return 8
@@ -174,18 +173,17 @@ class HamFinderGNN(HamFinder):
                            for first in graph_generator)
 
         walks = []
-        for batch in batch_generator:
-            data = torch_g.data.Batch.from_data_list(batch)
-            walks_tensor, _ = self.batch_run_greedy_neighbor(data)
-            new_walks = [[int(node.item()) for node in walk] for walk in walks_tensor]
-            for walk in new_walks:
-                try:
-                    del walk[:walk.index(-1)]
-                except IndexError:
-                    pass
-            walks = walks + new_walks
+        for list_of_graphs in batch_generator:
+            batch_shift = numpy.cumsum([0] + [g.num_nodes for g in list_of_graphs[:-1]])
+            batch_graph = torch_g.data.Batch.from_data_list(list_of_graphs)
+            walks_tensor, _ = self.batch_run_greedy_neighbor(batch_graph)
+            walks_tensor -= batch_shift[:, None]
+            walks_tensor[walks_tensor < 0] = -1
+            raw_walks = [[int(node.item()) for node in walk] for walk in walks_tensor]
+            for walk in raw_walks:
+                walk_end_index = walk.index(-1) if -1 in walk else len(walk)
+                walks.append(walk[:walk_end_index])
         return walks
-
 
 
 class HamCycleFinderWithValueFunction(HamFinderGNN):

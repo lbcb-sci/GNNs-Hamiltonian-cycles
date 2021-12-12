@@ -9,7 +9,7 @@ from matplotlib import pyplot
 
 from src.Models import HamFinderGNN, HamFinder
 from src.VisualisationTools import display_result_on_known_hamilton_graphs
-from src.Evaluation import EvaluationScores
+from src.Evaluation import EvaluationScores, EvaluationPlots
 from src.Development_code.Heuristics import HybridHam, LeastDegreeFirstHeuristics
 
 
@@ -38,33 +38,3 @@ def display_decisions_step_by_step(d: torch_g.data.Data, tour, selection):
         plt.show()
     plt.show()
     return tour
-
-
-def visualize_nn_performance_on_saved_data(hamilton_solvers: List[HamFinder], solver_names, data_dir=None):
-    scores_list = []
-    for solver, name in zip(hamilton_solvers, solver_names):
-        evals = EvaluationScores.evaluate_on_saved_data(solver.solve_graphs, nr_graphs_per_size=None, data_folders=data_dir)
-        scores = EvaluationScores.compute_accuracy_scores(evals)
-        scores["solver_name"] = name
-        scores_list.append(scores)
-    df_scores = pandas.concat(scores_list).reset_index(drop=True)
-    combined = []
-    for accuracy_col in [c for c in df_scores.columns if c.startswith("perc")]:
-        partial_df = df_scores[["size", "solver_name", accuracy_col]].copy()
-        partial_df.columns = [c if c != accuracy_col else "perc_score" for c in partial_df.columns]
-        partial_df["score_type"] = accuracy_col
-        combined.append(partial_df)
-    
-    df_scores = pandas.concat(combined, ignore_index=True)
-    seaborn.FacetGrid(data=df_scores, col="score_type").map_dataframe(seaborn.lineplot, x="size", y="perc_score", hue="solver_name")
-    plt.show()
-
-
-if __name__ == '__main__':
-    from train import train_HamS
-    HamS_model = train_HamS(True, 0)
-    hybrid_ham_heuristics = HybridHam()
-    least_degree_first = LeastDegreeFirstHeuristics()
-    visualize_nn_performance_on_saved_data(
-        [HamS_model, hybrid_ham_heuristics, least_degree_first],
-        ["HamS", "HybridHam", "Least_degree_first"], )

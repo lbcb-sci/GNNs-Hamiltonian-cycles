@@ -2,13 +2,14 @@ import matplotlib.pyplot as plt
 import pandas
 import numpy
 from typing import List
+import seaborn
 
 import torch
 import torch.utils.data
 import torch_geometric as torch_g
 
 from src.DatasetBuilder import ErdosRenyiInMemoryDataset
-from src.Models import HamFinderGNN
+from src.Models import HamFinder, HamFinderGNN
 from src.constants import *
 
 
@@ -18,12 +19,12 @@ class EvaluationScores:
         perc_long_cycles_found = "perc_long_cycles_found"
         perc_full_walks_found = "perc_full_walks_found"
         perc_long_walks_found = "perc_long_walks_found"
+        
 
     APPROXIMATE_HAMILTON_LOWER_BOUND = 0.9
 
     @staticmethod
     def is_walk_valid(graph: torch_g.data.Data, walk):
-
         neighbor_dict = {x: [] for x in range(graph.num_nodes)}
         for (x, y) in torch.t(graph.edge_index):
             x, y = x.item(), y.item()
@@ -59,9 +60,14 @@ class EvaluationScores:
             = (df["length"] > EvaluationScores.APPROXIMATE_HAMILTON_LOWER_BOUND * df["size"]) & (~df["is_cycle"])
 
         measurement_columns = ["is_ham_cycle", "is_ham_path", "is_approx_ham_cycle", "is_approx_ham_path"]
-        grouped = df[["size"] + measurement_columns].groupby("size").aggregate({name: "mean" for name in measurement_columns}).reset_index()
-        grouped.columns = [col.replace("is_", "perc_") for col in grouped]
-        return grouped
+        scores = df[["size"] + measurement_columns].groupby("size").aggregate({name: "mean" for name in measurement_columns}).reset_index()
+        _columns_rename_dict = {
+            "is_ham_cycle": EvaluationScores.ACCURACY_SCORE_TAGS.perc_hamilton_found,
+            "is_ham_path": EvaluationScores.ACCURACY_SCORE_TAGS.perc_full_walks_found,
+            "is_approx_ham_cycle": EvaluationScores.ACCURACY_SCORE_TAGS.perc_long_cycles_found,
+            "is_approx_ham_path": EvaluationScores.ACCURACY_SCORE_TAGS.perc_long_walks_found,
+        }
+        return scores.rename(columns=_columns_rename_dict)
 
     @staticmethod
     def _filtered_generator(num_per_size, gen):
@@ -104,70 +110,38 @@ class EvaluationScores:
 
 class EvaluationPlots:
     DEFAULT_FIGSIZE = (16, 9)
-
     @staticmethod
-    def single_eval_hist(eval_results, window_title):
-        fig = plt.figure(figsize=EvaluationPlots.DEFAULT_FIGSIZE)
-        ax1 = fig.add_subplot(1, 2, 1)
-        ax2 = fig.add_subplot(1, 2, 2, sharey=ax1)
-        fig.canvas.set_window_title(window_title)
-        ax1.set_title("Relative cycle length")
-        ax1.hist(eval_results["rel_cycle_len"], 20)
-        ax2.set_title("Relative walk length")
-        ax2.hist(eval_results["rel_walk_len"], 20)
-        return fig
-
+    def accuracy_curves_from_scores(df_solver_scores, columns_containing_scores_to_titles, score_axis_label="score", x_axis_column_name="graph size"):
+        _extracted_dfs = []
+        for score_column, score_name in columns_containing_scores_to_titles.items():
+            _score_df = df_solver_scores[[c for c in df_solver_scores if c not in columns_containing_scores_to_titles]].copy()
+            _score_df["score_type"] = score_name
+            _score_df[score_axis_label] = df_solver_scores[score_column]
+            _extracted_dfs.append(_score_df)
+        df_plotting = pandas.concat(_extracted_dfs)
+        facet_grid = seaborn.FacetGrid(data=df_plotting, col="score_type", hue="name", height=6, margin_titles=True)
+        facet_grid.map(seaborn.lineplot, x_axis_column_name, score_axis_label)
+        facet_grid.set_titles(col_template="{col_name}")
+        facet_grid.add_legend()
+        return facet_grid._figure
+    
     @staticmethod
-    def combined_histograms(evals, sizes):
-        fig = plt.figure(figsize=EvaluationPlots.DEFAULT_FIGSIZE)
-        ax1 = fig.add_subplot(1, 2, 1)
-        ax1.hist([e["rel_cycle_len"] for e in evals], 10, label=["ER-{}".format(s) for s in sizes])
-        ax1.set_title("Cycles")
-        ax1.set_ylabel("nr in Erdos-Renyi grap")
-        ax2 = fig.add_subplot(1, 2, 2)
-        ax2.hist([e["rel_walk_len"] for e in evals], 10)
-        ax2.set_title("Walks (start != finish)")
-        for a in [ax1, ax2]:
-            a.set_xlabel("relative len")
-            fig.legend(loc="upper left")
-        return fig
-
-    @staticmethod
-    def list_of_histograms(evals, sizes):
-        fig, axes = plt.subplots(nrows=len(evals), ncols=2, sharex=True, sharey=True)
-        ax_count = 1
-        for ax_index, size, eval_result in zip(range(len(sizes)), sizes, evals):
-            ax1 = axes[ax_index, 0]
-            ax2 = axes[ax_index, 1]
-            if ax_index == 0:
-                ax1.set_title("Relative cycle length")
-                ax2.set_title("Relative walk length")
-            ax1.set_ylabel("nr in {}-ER".format(size))
-            ax_count += 2
-            ax1.hist(eval_result["rel_cycle_len"], 20)
-            ax2.hist(eval_result["rel_walk_len"], 20)
-        return fig
-
-    @staticmethod
-    def accuracy_curves(evals, sizes, best_expected_benchmark=None):
-        hamilton_perc, approx_hamilton_perc, full_walk_perc, long_walk_perc, perc_ham_graphs \
-            = EvaluationScores.compute_accuracy_scores(evals, sizes)
-        fig = plt.figure(figsize=EvaluationPlots.DEFAULT_FIGSIZE)
-        ax = fig.add_subplot(1, 1, 1)
-        for line, color, marker, label in zip([hamilton_perc, approx_hamilton_perc, full_walk_perc, long_walk_perc],
-                                              ["red", "orange", "blue", "cyan"], [".", "v", "x", "D"],
-                                              ["Hamilton cycles found", "Cycles with > 90% nodes found",
-                                               "Complete walks (start != finish) found", "Walks with > 90% nodes found"]):
-            ax.plot(sizes, [x*100 for x in line], color=color, label=label, marker=marker, linestyle='dotted', markersize=12)
-        if all([x is not None for x in perc_ham_graphs]):
-            ax.plot(sizes, [x*100 for x in perc_ham_graphs], color="gray", label="Hamiltonian graphs", linestyle="dashed")
-        elif best_expected_benchmark is not None:
-            ax.plot(sizes, [best_expected_benchmark*100 for _ in sizes], linestyle="dashed", label="Expected Hamilton cycles", color="gray")
-        ax.set_xlabel("Graph size")
-        ax.set_ylabel("% of solutions")
-        ax.set_ylim(0, 100)
-        ax.legend(loc="upper right")
-        return fig
+    def accuracy_curves_for_saved_data(solvers: List[HamFinder], solver_names: List[str], nr_graphs_per_size=10, data_folders=None, best_possible_score=None):
+        evaluations_list = []
+        for solver, name in zip(solvers, solver_names):
+            evals = EvaluationScores.evaluate_model_on_saved_data(solver, nr_graphs_per_size=nr_graphs_per_size, data_folders=data_folders)
+            _df_solver_score = pandas.DataFrame(EvaluationScores.compute_accuracy_scores(evals))
+            _df_solver_score["name"] = name
+            evaluations_list.append(_df_solver_score)
+        df_scores = pandas.concat(evaluations_list, axis=0)
+        df_scores = df_scores.rename(columns={"size": "graph size"})
+        _score_columns_to_titles = {
+            EvaluationScores.ACCURACY_SCORE_TAGS.perc_hamilton_found: "Hamiltonian cycle",
+            EvaluationScores.ACCURACY_SCORE_TAGS.perc_full_walks_found: "Hamiltonian path",
+            EvaluationScores.ACCURACY_SCORE_TAGS.perc_long_cycles_found: "long cycle (>90% nodes)",
+            EvaluationScores.ACCURACY_SCORE_TAGS.perc_long_walks_found: "long paths (>90% nodes)",
+        }
+        return EvaluationPlots.accuracy_curves_from_scores(df_scores, _score_columns_to_titles, score_axis_label="% of target structure")
 
     @staticmethod
     def model_performance(evals):
