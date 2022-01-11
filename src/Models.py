@@ -39,7 +39,7 @@ class WalkUpdater:
 
 class HamFinder(ABC):
     @abstractmethod
-    def solve_graphs(self, graphs: List[torch_g.data.Data]) -> List[int]:
+    def solve_graphs(self, graphs: List[torch_g.data.Data]) -> List[List[int]]:
         pass
 
 
