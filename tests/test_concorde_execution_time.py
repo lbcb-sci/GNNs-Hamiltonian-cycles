@@ -7,9 +7,10 @@ import pandas
 from src.GraphGenerators import ErdosRenyiGenerator
 from src.ExactSolvers import ConcordeHamiltonSolver
 
-if __name__ == "__main__":
-    graph_sizes = [2**k for k in range(5, 15)]
-    examples_per_size = 3
+
+def test_concorde_execution_time():
+    graph_sizes = [int((1.5)**k) for k in range(10, 25)]
+    examples_per_size = 10
     ham_existence_prob = 0.8
     print(f"Checking concorde execution time on Erdos-Renyi graphs with {ham_existence_prob} asysmptotic probability of being Hamiltonian."
           f"Timing execution {examples_per_size} times per each graph_size in {graph_sizes}")
@@ -18,16 +19,27 @@ if __name__ == "__main__":
     else:
         processor_model_name = "unknown"
     print(f"Processor model: {processor_model_name} (Concorde is a single-thread program)")
-    concorde_solver = ConcordeHamiltonSolver()
+    concorde_solver = ConcordeHamiltonSolver(working_subdir="test_execution_time")
     
     _sizes_column = []
-    _times_column = []
+    _real_time_column = []
+    _user_time_column = []
+    _is_hamiltonian_column = []
     for size in tqdm(graph_sizes):
         generator = ErdosRenyiGenerator(size, ham_existence_prob)
         for graph in tqdm(itertools.islice(generator, examples_per_size), leave=False, total=examples_per_size):
-            exec_time = concorde_solver.time_execution(graph)[1]
+            solution, real_time, user_time = concorde_solver.time_execution(graph)
             _sizes_column.append(size)
-            _times_column.append(exec_time)
-    df_times = pandas.DataFrame({"graph_size": _sizes_column, "execution_time": _times_column})
-    df_times.to_csv("concorde_execution_times.csv")
+            _real_time_column.append(real_time)
+            _user_time_column.append(user_time)
+            _is_hamiltonian_column.append(len(solution) == (size + 1))
+            
+    df_times = pandas.DataFrame({"graph_size": _sizes_column, "real_execution_time": _real_time_column,
+                                 "user_execution_time": _user_time_column, "is_hamiltonian": _is_hamiltonian_column})
+    return df_times
+
+    
+if __name__ == "__main__":
+    df_times = test_concorde_execution_time()
+    df_times.to_csv("test/concorde_execution_times.csv")
     print(df_times.groupby("graph_size").agg("mean"))

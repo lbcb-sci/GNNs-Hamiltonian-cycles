@@ -5,7 +5,7 @@ if __name__ == '__main__':
     import torch
     torch.set_num_threads(1)
     from train import train_HamS
-    HamS_model = train_HamS(False, 0)
+    HamS_model = train_HamS(False, 100)
     hybrid_ham_heuristics = HybridHam()
     least_degree_first = LeastDegreeFirstHeuristics()
     fig = EvaluationPlots.accuracy_curves_for_saved_data(
