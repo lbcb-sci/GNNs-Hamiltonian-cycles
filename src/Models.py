@@ -1,12 +1,10 @@
 import itertools
-from os import walk
 import os.path
 from abc import ABC, abstractmethod
 from typing import List
 import numpy
 
 import torch
-from torch._C import Value
 import torch.nn.functional as F
 import torch_scatter
 import torch_geometric as torch_g
@@ -29,7 +27,6 @@ class WalkUpdater:
         previous = torch.squeeze(torch.nonzero(torch.eq(d.x[..., 1], torch.ones_like(d.x[..., 1]))), -1)
 
         if torch.any(current_nodes < 0).item() or torch.any(current_nodes > d.num_nodes).item():
-            print("Illegal choice of next step when updating graph mask")
             raise Exception("Illegal choice of next step node when updating graph mask!")
 
         d.x[previous, 1] = 0
@@ -41,11 +38,15 @@ class HamFinder(ABC):
     @abstractmethod
     def solve_graphs(self, graphs: List[torch_g.data.Data]) -> List[List[int]]:
         pass
+    
+    def solve(self, graph: torch_g.data.Data):
+        return self.solve_graphs([graph])[0]
 
 
 class HamFinderGNN(HamFinder):
     def __init__(self, graph_updater: WalkUpdater):
         self.graph_updater = graph_updater
+        self.BATCH_SIZE_DURING_INFERENCE = 8
 
     @abstractmethod
     def next_step_logits(self, d: torch_g.data.Batch) -> torch.Tensor:
@@ -137,7 +138,8 @@ class HamFinderGNN(HamFinder):
             self.init_graph(batch_data)
             all_choices, all_scores = [], []
             choice = None
-            stop_algorithm_mask = torch.zeros([batch_data.num_graphs], device=batch_data.edge_index.device, dtype=torch.uint8)
+            stop_algorithm_mask = torch.zeros(
+                [batch_data.num_graphs], device=batch_data.edge_index.device, dtype=torch.uint8)
 
             for step in range(0, max_steps_in_a_cycle):
                 if step < 2:
@@ -166,7 +168,7 @@ class HamFinderGNN(HamFinder):
             return walks, selections
 
     def get_batch_size_for_multi_solving(self):
-        return 8
+        return self.BATCH_SIZE_DURING_INFERENCE
 
     def solve_graphs(self, graph_generator):
         batch_size = self.get_batch_size_for_multi_solving()
