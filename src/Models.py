@@ -147,10 +147,11 @@ class HamFinderGNN(HamFinder):
                     self.update_state(batch_data, current_nodes[current_nodes != -1])
                 p, choice = self._neighbor_prob_and_greedy_choice_for_batch(batch_data)
                 choice = torch.logical_not(stop_algorithm_mask) * choice - stop_algorithm_mask
-                p = p * torch.logical_not(stop_algorithm_mask)[..., None]- stop_algorithm_mask[..., None]
+                p = p * torch.logical_not(stop_algorithm_mask)[..., None] - stop_algorithm_mask[..., None]
                 if len(all_choices) > 0:
-                    stop_algorithm_mask = torch.maximum(
-                        stop_algorithm_mask, torch.any(torch.stack([torch.eq(x, choice) for x in all_choices])))
+                    already_visited_mask = torch.any(
+                        torch.stack([torch.eq(x, choice) for x in all_choices], -1), -1)
+                    stop_algorithm_mask = torch.maximum(stop_algorithm_mask, already_visited_mask)
                 all_choices.append(choice)
                 all_scores.append(p)
 
