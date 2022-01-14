@@ -41,5 +41,5 @@ def test_concorde_execution_time():
     
 if __name__ == "__main__":
     df_times = test_concorde_execution_time()
-    df_times.to_csv("test/concorde_execution_times.csv")
+    df_times.to_csv("tests/concorde_execution_times.csv")
     print(df_times.groupby("graph_size").agg("mean"))

@@ -7,8 +7,9 @@ from src.ExactSolvers import ConcordeHamiltonSolver
 
 
 def check_graph_generator_Hamilton_percentage():
-    nr_examples = 100
-    graph_sizes = [20, 40, 60, 80, 100, 125, 150, 175, 200, 250, 300, 400, 500, 750, 1000, 1500]
+    nr_examples = 500
+    # graph_sizes = [20, 40, 60, 80, 100, 125, 150, 175, 200, 250, 300, 400, 500, 750, 1000, 1500]
+    graph_sizes = list(range(50, 1050, 50))
     ham_existence_probabilty = 0.8
     nr_hamiltonian_per_size = []
     concorde_solver = ConcordeHamiltonSolver(working_subdir="test_graph_hamiltonian_fraction")
@@ -28,6 +29,6 @@ def check_graph_generator_Hamilton_percentage():
 
 if __name__ == "__main__":
     df_hamiltonian = check_graph_generator_Hamilton_percentage()
-    df_hamiltonian.to_csv("fraction_hamiltonian_graphs.csv")
+    df_hamiltonian.to_csv("tests/fraction_hamiltonian_graphs.csv")
     print(f"Fractions are as follows: {df_hamiltonian['Hamiltonian_fraction']}")
     
