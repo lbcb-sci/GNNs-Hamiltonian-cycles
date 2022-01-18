@@ -38,7 +38,7 @@ class HamFinder(ABC):
     @abstractmethod
     def solve_graphs(self, graphs: List[torch_g.data.Data]) -> List[List[int]]:
         pass
-    
+
     def solve(self, graph: torch_g.data.Data):
         return self.solve_graphs([graph])[0]
 
@@ -67,7 +67,7 @@ class HamFinderGNN(HamFinder):
 
     @staticmethod
     def _mask_neighbor_logits(logits, d: torch_g.data.Data):
-        valid_next_step_indices = torch.nonzero(HamFinderGNN._neighbor_mask(d)).squeeze(-1)
+        valid_next_step_indices = HamFinderGNN._neighbor_mask(d)
         neighbor_logits = torch.zeros_like(logits).log()
         neighbor_logits[valid_next_step_indices] = logits.index_select(0, valid_next_step_indices)
         return neighbor_logits
@@ -163,17 +163,18 @@ class HamFinderGNN(HamFinder):
             selections = torch.stack(all_scores, -2)
             if walks.shape[-1] != max_steps_in_a_cycle:
                 walks = F.pad(walks, (0, max_steps_in_a_cycle - walks.shape[-1]), value=-1)
-            if selections.shape[-2] != max_steps_in_a_cycle: 
+            if selections.shape[-2] != max_steps_in_a_cycle:
                 selections = F.pad(selections, (0, 0, 0, max_steps_in_a_cycle - selections.shape[-2]), value=-1)
             return walks, selections
 
     def get_batch_size_for_multi_solving(self):
         return self.BATCH_SIZE_DURING_INFERENCE
 
-    def solve_graphs(self, graph_generator):
+    def solve_graphs(self, graphs):
+        graph_iterator = iter(graphs)
         batch_size = self.get_batch_size_for_multi_solving()
-        batch_generator = ([first] + [d for d in itertools.islice(graph_generator, batch_size - 1)]
-                           for first in graph_generator)
+        batch_generator = ([first] + [d for d in itertools.islice(graph_iterator, batch_size - 1)]
+                           for first in graph_iterator)
 
         walks = []
         for list_of_graphs in batch_generator:
