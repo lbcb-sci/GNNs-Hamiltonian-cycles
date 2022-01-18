@@ -3,10 +3,12 @@ import torch_geometric as torch_g
 import torch
 import itertools
 import pandas
-
+import warnings
 
 def _generate_ERmk_model_edge_index_for_small_k(num_nodes, num_edges):
-    assert num_edges < num_nodes * (num_nodes - 1) // 4
+    _edge_fraction = 2 * num_edges / (num_nodes * (num_nodes - 1))
+    if _edge_fraction > 1/2:
+        print(f"Using inefficient method (ment for sparse graph with edge fraction << 1) for Erdos-Renyi graph with edge fraction {_edge_fraction}")
     original_dtype = numpy.int64
     _generation_overhead = 0.1
     edge_index = numpy.empty([0, 2], dtype=original_dtype)
