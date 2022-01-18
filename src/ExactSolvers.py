@@ -12,9 +12,9 @@ from src.Models import HamFinder
 from src.constants import CONCORDE_SCRIPT_PATH, CONCORDE_WORK_DIR, CONCORDE_INPUT_FILE
 
 class ConcordeHamiltonSolver(HamFinder):
-    def __init__(self, working_subdir=""):
+    def __init__(self, root_dir=CONCORDE_WORK_DIR, working_subdir=""):
         self.CONCORDE_EXECUTABLE_PATH = CONCORDE_SCRIPT_PATH
-        self.working_dir = os.path.join(CONCORDE_WORK_DIR, working_subdir)
+        self.working_dir = os.path.join(root_dir, working_subdir)
         self.CONCORDE_INPUT_FILE = CONCORDE_INPUT_FILE
 
     def init_work_folder(self):
@@ -24,13 +24,13 @@ class ConcordeHamiltonSolver(HamFinder):
     def clean(self):
         if os.path.isdir(self.working_dir):
             shutil.rmtree(self.working_dir)
-    
+
     def __del__(self):
         self.clean()
 
-    def create_input_file(self, d: torch_g.data.Data, output_file=None, name="Unnamed_instance.tsp"):
-        if output_file is None:
-            output_file = os.path.join(self.working_dir, self.CONCORDE_INPUT_FILE)
+    def create_input_file(self, d: torch_g.data.Data, filename=None, name="Unnamed_instance.tsp"):
+        if filename is None:
+            filename = os.path.join(self.working_dir, self.CONCORDE_INPUT_FILE)
 
         adjacency = torch.sparse_coo_tensor(
             d.edge_index, torch.ones(d.edge_index.shape[1], dtype=torch.int, device=d.edge_index.device),
@@ -49,12 +49,13 @@ class ConcordeHamiltonSolver(HamFinder):
             EDGE_WEIGHT_FORMAT: FULL_MATRIX
             EDGE_WEIGHT_SECTION
             {}""").format(name, d.num_nodes, weights_str)
-        with open(output_file, "w") as out:
+        with open(filename, "w") as out:
             out.write(out_string)
 
-    def time_execution(self, d: torch_g.data.Data, input_file=None):
+    def time_execution(self, d: torch_g.data.Data, input_file=None, is_consume_input_file=False):
         if input_file is None:
             self.create_input_file(d)
+            is_consume_input_file=True
             input_file = os.path.join(self.working_dir, self.CONCORDE_INPUT_FILE)
         input_file = os.path.abspath(input_file)
         called_process = subprocess.run(["time", self.CONCORDE_EXECUTABLE_PATH, input_file],
@@ -81,10 +82,14 @@ class ConcordeHamiltonSolver(HamFinder):
         if len(tour) > 0:
             # Empty list indicates no solution. Otherwise it is a cycle but the end point is not the starting point
             tour.append(tour[0])
+
+        if is_consume_input_file:
+            os.remove(input_file)
+
         return tour, real_time, user_time
 
     def solve(self, d: torch_g.data.Data, input_file=None):
         return self.time_execution(d, input_file)[0]
-    
+
     def solve_graphs(self, graphs: List[torch_g.data.Data]):
         return [self.solve(graph) for graph in graphs]
