@@ -9,6 +9,7 @@ import torch.nn.functional as F
 import torch_scatter
 import torch_geometric as torch_g
 import torchinfo
+import pytorch_lightning as torch_lightning
 
 from src.NN_modules import ResidualMultilayerMPNN, MultilayerGatedGCN
 from src.constants import MODEL_WEIGHTS_FOLDER
@@ -91,14 +92,6 @@ class HamFinderGNN(HamFinder):
 
     @abstractmethod
     def init_graph(self, d) -> None:
-        pass
-
-    @abstractmethod
-    def to(self, device) -> None:
-        pass
-
-    @abstractmethod
-    def get_device(self) -> str:
         pass
 
     @abstractmethod
@@ -196,7 +189,7 @@ class HamCycleFinderWithValueFunction(HamFinderGNN):
         pass
 
 
-class EncodeProcessDecodeAlgorithm(HamFinderGNN):
+class EncodeProcessDecodeAlgorithm(HamFinderGNN, torch_lightning.LightningModule):
     def _construct_processor(self):
         return ResidualMultilayerMPNN(dim=self.hidden_dim, message_dim=self.hidden_dim, edges_dim=1,
                                       nr_layers=self.processor_depth)
@@ -206,8 +199,7 @@ class EncodeProcessDecodeAlgorithm(HamFinderGNN):
         decoder_nn = torch.nn.Sequential(torch.nn.Linear(self.hidden_dim + self.hidden_dim, self.out_dim))
         return encoder_nn, decoder_nn
 
-    def __init__(self, is_load_weights=True, processor_depth=3, in_dim=1, out_dim=1, hidden_dim=32,
-                 device="cpu", graph_updater=WalkUpdater()):
+    def __init__(self, is_load_weights=True, processor_depth=3, in_dim=1, out_dim=1, hidden_dim=32, graph_updater=WalkUpdater(), loss_type="mse"):
         super(EncodeProcessDecodeAlgorithm, self).__init__(graph_updater)
         self.PROCESSOR_NAME = f"{self.__class__.__name__}_Processor.tar"
         self.ENCODER_NAME = f"{self.__class__.__name__}_Encoder.tar"
@@ -217,28 +209,16 @@ class EncodeProcessDecodeAlgorithm(HamFinderGNN):
         self.in_dim = in_dim
         self.out_dim = out_dim
         self.hidden_dim = hidden_dim
-        self.device = device
         self.processor_depth = processor_depth
+        assert loss_type in ["mse", "entropy"]
+        self.loss_type = loss_type
 
         self.encoder_nn, self.decoder_nn = self._construct_encoder_and_decoder()
         self.processor_nn = self._construct_processor()
         self.initial_h = torch.rand(self.hidden_dim, device=self.device)
-        self.to(device)
 
         if is_load_weights:
             self.load_weights()
-
-    def to(self, device):
-        for module in [self.decoder_nn, self.encoder_nn, self.processor_nn]:
-            module.to(device)
-        self.initial_h = self.initial_h.to(device)
-        self.device = device
-
-    def to_cuda(self):
-        self.to("cuda")
-
-    def get_device(self):
-        return self.device
 
     def description(self):
         return f"encoder: {torchinfo.summary(self.encoder_nn, verbose=0, depth=5)}\n" \
@@ -277,6 +257,48 @@ class EncodeProcessDecodeAlgorithm(HamFinderGNN):
         #TODO edge features are useless here but are needed because of how layers are implemented at the moment
         d.edge_attr = torch.ones([d.edge_index.shape[1], 1], device=self.device)
         d.h = torch.stack([self.initial_h for _ in range(d.num_nodes)], dim=-2)
+
+    def forward(self, d: torch_g.data.Data):
+        return self.next_step_logits_masked_over_neighbors(d)
+
+    def training_step(self, batch_dict):
+        batch_graph = batch_dict["batch_graph"]
+        teacher_paths = batch_dict["teacher_paths"]
+
+        self.init_graph(batch_graph)
+        self.prepare_for_first_step(batch_graph, None)
+        self.next_step_logits(batch_graph)
+        self.hamilton_nn.prepare_for_first_step(batch_graph, teacher_paths[..., 0])
+
+        loss = torch.zeros(1) # TODO not sure if this will initialize on the correct device
+        graph_sizes = torch.sum(F.one_hot(self.batch_graph.batch, batch_graph.num_graphs), dim=-1)
+        graph_shifts = graph_sizes.cumsum(0)
+        max_steps = torch.max(graph_sizes, dim=-1) + 1
+        for step in range(1, max_steps):
+            if step > 1:
+                self.update_state(batch_graph, teacher_paths[..., step - 1])
+            teacher_paths[..., step]
+            if self.loss_type == "mse":
+                p = self.next_step_prob_masked_over_neighbors(batch_graph)
+                mse_loss = torch.nn.MSELoss()
+                loss += mse_loss(p, torch.zeros_like(p).index_fill(0, teacher_paths[..., step], 1.))
+            elif self.loss_type == "entropy":
+                logits = self.next_step_logits_masked_over_neighbors(batch_graph)
+                entropy_loss = torch.nn.CrossEntropyLoss()
+                for graph_id in range(len(graph_shifts)):
+                    graph_start_index = graph_shifts[graph_id]
+                    graph_end_index = graph_shifts[graph_id+1] if id < len(graph_shifts) else logits.shape[-1]
+                    loss += entropy_loss(logits[graph_start_index: graph_end_index], teacher_paths[..., step] - graph_start_index)
+        return loss
+
+    def validation_step(self, batch_dict):
+        pass
+
+    def predict_step(self, batch_dict):
+        pass
+
+    def configure_optimizers(self):
+        pass
 
     def save_weights(self, directory=MODEL_WEIGHTS_FOLDER):
         encoder_path, decoder_path, processor_path, initial_hidden_path = self.get_weights_paths(directory)
