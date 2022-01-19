@@ -3,15 +3,19 @@ import platform
 import subprocess
 import itertools
 import pandas
+import time
+from pathlib import Path
 
 from src.GraphGenerators import ErdosRenyiGenerator
 from src.ExactSolvers import ConcordeHamiltonSolver
 
 
 def test_concorde_execution_time():
-    graph_sizes = [int((1.5)**k) for k in range(10, 25)]
-    examples_per_size = 10
+    graph_sizes = [int((1.5)**k) for k in range(26, 35)]
+    examples_per_size = 3
     ham_existence_prob = 0.8
+    timestamp = int(time.time())
+    
     print(f"Checking concorde execution time on Erdos-Renyi graphs with {ham_existence_prob} asysmptotic probability of being Hamiltonian."
           f"Timing execution {examples_per_size} times per each graph_size in {graph_sizes}")
     if platform.system() == "Linux":
@@ -35,11 +39,15 @@ def test_concorde_execution_time():
             _is_hamiltonian_column.append(len(solution) == (size + 1))
             
     df_times = pandas.DataFrame({"graph_size": _sizes_column, "real_execution_time": _real_time_column,
-                                 "user_execution_time": _user_time_column, "is_hamiltonian": _is_hamiltonian_column})
+                                 "user_execution_time": _user_time_column, "is_hamiltonian": _is_hamiltonian_column,
+                                 "timestamp": timestamp, "HC_existence_probability": ham_existence_prob})
     return df_times
 
     
 if __name__ == "__main__":
-    df_times = test_concorde_execution_time()
-    df_times.to_csv("tests/concorde_execution_times.csv")
-    print(df_times.groupby("graph_size").agg("mean"))
+    df_path = Path("tests/concorde_execution_times.csv")
+    df_new = test_concorde_execution_time()
+    df_old = pandas.read_csv(df_path)
+    df = pandas.concat([df_old, df_new])
+    df.to_csv(df_path, index=False)
+    print(df.groupby("graph_size").agg("mean"))

@@ -19,7 +19,7 @@ class EvaluationScores:
         perc_long_cycles_found = "perc_long_cycles_found"
         perc_full_walks_found = "perc_full_walks_found"
         perc_long_walks_found = "perc_long_walks_found"
-        
+
 
     APPROXIMATE_HAMILTON_LOWER_BOUND = 0.9
 
@@ -107,11 +107,30 @@ class EvaluationScores:
 
         return EvaluationScores.evaluate_on_saved_data(_compute_walks_from_graph_list_fn, nr_graphs_per_size, data_folders)
 
+    @staticmethod
+    def accuracy_scores_on_saved_data(solvers: List[HamFinder], solver_names: List[str], nr_graphs_per_size=10, data_folders=None, best_possible_score=None):
+        evaluations_list = []
+        for solver, name in zip(solvers, solver_names):
+            evals = EvaluationScores.evaluate_model_on_saved_data(solver, nr_graphs_per_size=nr_graphs_per_size, data_folders=data_folders)
+            _df_solver_score = pandas.DataFrame(EvaluationScores.compute_accuracy_scores(evals))
+            _df_solver_score["name"] = name
+            evaluations_list.append(_df_solver_score)
+        df_scores = pandas.concat(evaluations_list, axis=0)
+        df_scores = df_scores.rename(columns={"size": "graph size"})
+        return df_scores
+
 
 class EvaluationPlots:
     DEFAULT_FIGSIZE = (16, 9)
     @staticmethod
-    def accuracy_curves_from_scores(df_solver_scores, columns_containing_scores_to_titles, score_axis_label="score", x_axis_column_name="graph size"):
+    def accuracy_curves_from_scores(df_solver_scores, columns_containing_scores_to_titles = None, score_axis_label="score", x_axis_column_name="graph size"):
+        if columns_containing_scores_to_titles is None:
+            columns_containing_scores_to_titles = {
+                EvaluationScores.ACCURACY_SCORE_TAGS.perc_hamilton_found: "Hamiltonian cycle",
+                EvaluationScores.ACCURACY_SCORE_TAGS.perc_full_walks_found: "Hamiltonian path",
+                EvaluationScores.ACCURACY_SCORE_TAGS.perc_long_cycles_found: "long cycle (>90% nodes)",
+                EvaluationScores.ACCURACY_SCORE_TAGS.perc_long_walks_found: "long paths (>90% nodes)",
+            }
         _extracted_dfs = []
         for score_column, score_name in columns_containing_scores_to_titles.items():
             _score_df = df_solver_scores[[c for c in df_solver_scores if c not in columns_containing_scores_to_titles]].copy()
@@ -124,24 +143,6 @@ class EvaluationPlots:
         facet_grid.set_titles(col_template="{col_name}")
         facet_grid.add_legend()
         return facet_grid._figure
-    
-    @staticmethod
-    def accuracy_curves_for_saved_data(solvers: List[HamFinder], solver_names: List[str], nr_graphs_per_size=10, data_folders=None, best_possible_score=None):
-        evaluations_list = []
-        for solver, name in zip(solvers, solver_names):
-            evals = EvaluationScores.evaluate_model_on_saved_data(solver, nr_graphs_per_size=nr_graphs_per_size, data_folders=data_folders)
-            _df_solver_score = pandas.DataFrame(EvaluationScores.compute_accuracy_scores(evals))
-            _df_solver_score["name"] = name
-            evaluations_list.append(_df_solver_score)
-        df_scores = pandas.concat(evaluations_list, axis=0)
-        df_scores = df_scores.rename(columns={"size": "graph size"})
-        _score_columns_to_titles = {
-            EvaluationScores.ACCURACY_SCORE_TAGS.perc_hamilton_found: "Hamiltonian cycle",
-            EvaluationScores.ACCURACY_SCORE_TAGS.perc_full_walks_found: "Hamiltonian path",
-            EvaluationScores.ACCURACY_SCORE_TAGS.perc_long_cycles_found: "long cycle (>90% nodes)",
-            EvaluationScores.ACCURACY_SCORE_TAGS.perc_long_walks_found: "long paths (>90% nodes)",
-        }
-        return EvaluationPlots.accuracy_curves_from_scores(df_scores, _score_columns_to_titles, score_axis_label="% of target structure")
 
     @staticmethod
     def model_performance(evals):
