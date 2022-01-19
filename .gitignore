@@ -1,0 +1,10 @@
+**/*.pyc
+
+
+tst/**/*.ipynb
+tst/**/*.csv
+tst/**/*.pkl
+tst/**/*.pickle
+tst/**/*.pcl
+tst/**/*.jpg
+tst/**/*.svg
