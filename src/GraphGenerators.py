@@ -36,11 +36,10 @@ def generate_ERp_model_edge_index_for_small_k(num_nodes, prob):
     return _generate_ERmk_model_edge_index_for_small_k(num_nodes, num_edges)
 
 
-class NoisyCycleBatchGenerator:
-    def __init__(self, num_nodes, expected_noise_edge_for_node, batch_size=1):
+class NoisyCycleGenerator:
+    def __init__(self, num_nodes, expected_noise_edge_for_node):
         self.num_nodes = num_nodes
         self.expected_noise_edge_for_node = expected_noise_edge_for_node
-        self.batch_size = batch_size
 
     def _generate_noisy_cycle(self):
         d = torch_g.data.Data()
@@ -52,26 +51,14 @@ class NoisyCycleBatchGenerator:
         artificial_cycle = torch.cat([artificial_cycle, artificial_cycle[0].unsqueeze(0)], dim=0)
         d.num_nodes = self.num_nodes
         d.edge_index = torch.cat([ER_edge_index, artificial_edges], dim=-1)
-        return d, artificial_cycle
-
-    def _generate_batch(self):
-        graphs = []
-        cycles = []
-        for _ in range(self.batch_size):
-            g, c = self._generate_noisy_cycle()
-            graphs += [g]
-            cycles += [c]
-        batch = torch_g.data.Batch.from_data_list(graphs)
-        cycles = torch.stack(cycles)
-        cycles = cycles + self.num_nodes * torch.arange(0, self.batch_size)[..., None]
-        return batch, cycles, None
+        choice_distribution = None
+        return d, artificial_cycle, choice_distribution
 
     def output_details(self):
-        return f"Batch of {self.batch_size} {self.num_nodes}-cycles with expected {self.expected_noise_edge_for_node}" \
-               f" noise edge per node"
+        return f"A cycle of with expected {self.expected_noise_edge_for_node} noise edge per node"
 
     def __iter__(self):
-        return (self._generate_batch() for _ in itertools.count())
+        return (self._generate_noisy_cycle() for _ in itertools.count())
 
 
 class ErdosRenyiGenerator:
@@ -95,4 +82,4 @@ class ErdosRenyiGenerator:
         return f"ER({self.num_nodes}, {self.p})"
 
     def __iter__(self):
-        return (self._erdos_renyi_generator() for i in itertools.count())
+        return (self._erdos_renyi_generator() for _ in itertools.count())
