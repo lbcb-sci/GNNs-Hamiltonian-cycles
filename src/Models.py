@@ -219,7 +219,7 @@ class EncodeProcessDecodeAlgorithm(HamFinderGNN, torch_lightning.LightningModule
 
         self.encoder_nn, self.decoder_nn = self._construct_encoder_and_decoder()
         self.processor_nn = self._construct_processor()
-        self.initial_h = torch.rand(self.hidden_dim)
+        self.initial_h = torch.nn.Parameter(torch.rand(self.hidden_dim))
 
         if is_load_weights:
             self.load_weights()
@@ -259,22 +259,25 @@ class EncodeProcessDecodeAlgorithm(HamFinderGNN, torch_lightning.LightningModule
 
     def init_graph(self, d):
         #TODO edge features are useless here but are needed because of how layers are implemented at the moment
-        d.edge_attr = torch.ones([d.edge_index.shape[1], 1], device=self.device)
+        d.edge_attr = torch.ones_like(d.edge_index[0, ...].unsqueeze(-1), dtype=self.initial_h.dtype)
         d.h = torch.stack([self.initial_h for _ in range(d.num_nodes)], dim=-2)
 
     def forward(self, d: torch_g.data.Data):
         return self.next_step_logits_masked_over_neighbors(d)
 
-    def training_step(self, graph_batch_example: GraphBatchExample):
-        batch_graph = graph_batch_example.graph_batch
-        teacher_paths = graph_batch_example.teacher_paths
+    def training_step(self, graph_batch_example):
+        batch_graph = torch_g.data.Batch()
+        batch_graph.num_nodes = graph_batch_example["num_nodes"]
+        batch_graph.edge_index = graph_batch_example["edge_index"]
+        batch_graph.batch = graph_batch_example["batch_vector"]
+        teacher_paths = graph_batch_example["teacher_paths"]
 
         self.init_graph(batch_graph)
         self.prepare_for_first_step(batch_graph, None)
         self.next_step_logits(batch_graph)
         self.prepare_for_first_step(batch_graph, [teacher_path[0] for teacher_path in teacher_paths])
 
-        loss = torch.zeros(1) # TODO not sure if this will initialize on the correct device
+        loss = torch.zeros(1, device=batch_graph.edge_index.device)
         graph_sizes = torch.sum(F.one_hot(batch_graph.batch, batch_graph.num_graphs), dim=0)
         graph_shifts = graph_sizes.cumsum(0).roll(1)
         graph_shifts[0] = 0
