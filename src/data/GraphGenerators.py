@@ -3,7 +3,17 @@ import torch_geometric as torch_g
 import torch
 import itertools
 import pandas
-import warnings
+from typing import List, Iterator
+from abc import ABC, abstractmethod
+
+from src.data.GraphDataset import GraphExample
+
+
+class GraphGenerator(ABC):
+    @abstractmethod
+    def __iter__(self) -> Iterator[GraphExample]:
+        pass
+
 
 def _generate_ERmk_model_edge_index_for_small_k(num_nodes, num_edges):
     _edge_fraction = 2 * num_edges / (num_nodes * (num_nodes - 1))
@@ -36,7 +46,7 @@ def generate_ERp_model_edge_index_for_small_k(num_nodes, prob):
     return _generate_ERmk_model_edge_index_for_small_k(num_nodes, num_edges)
 
 
-class NoisyCycleGenerator:
+class NoisyCycleGenerator(GraphGenerator):
     def __init__(self, num_nodes, expected_noise_edge_for_node):
         self.num_nodes = num_nodes
         self.expected_noise_edge_for_node = expected_noise_edge_for_node
@@ -52,7 +62,7 @@ class NoisyCycleGenerator:
         d.num_nodes = self.num_nodes
         d.edge_index = torch.cat([ER_edge_index, artificial_edges], dim=-1)
         choice_distribution = None
-        return d, artificial_cycle, choice_distribution
+        return GraphExample(d, artificial_cycle, choice_distribution)
 
     def output_details(self):
         return f"A cycle of with expected {self.expected_noise_edge_for_node} noise edge per node"

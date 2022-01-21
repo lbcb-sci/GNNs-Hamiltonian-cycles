@@ -4,7 +4,7 @@ import itertools
 
 import torch.utils.data
 
-from src.GraphGenerators import ErdosRenyiGenerator
+from src.data.GraphGenerators import ErdosRenyiGenerator
 from src.ExactSolvers import ConcordeHamiltonSolver
 
 
