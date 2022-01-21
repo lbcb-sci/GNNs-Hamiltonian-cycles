@@ -3,6 +3,7 @@ import os.path
 from abc import ABC, abstractmethod
 from typing import List
 import numpy
+from sklearn.metrics import mean_squared_log_error
 
 import torch
 import torch.nn.functional as F
@@ -12,6 +13,7 @@ import torchinfo
 import pytorch_lightning as torch_lightning
 
 from src.NN_modules import ResidualMultilayerMPNN, MultilayerGatedGCN
+from src.data.GraphDataset import GraphBatchExample
 from src.constants import MODEL_WEIGHTS_FOLDER
 
 
@@ -200,7 +202,9 @@ class EncodeProcessDecodeAlgorithm(HamFinderGNN, torch_lightning.LightningModule
         return encoder_nn, decoder_nn
 
     def __init__(self, is_load_weights=True, processor_depth=3, in_dim=1, out_dim=1, hidden_dim=32, graph_updater=WalkUpdater(), loss_type="mse"):
-        super(EncodeProcessDecodeAlgorithm, self).__init__(graph_updater)
+        super(HamFinderGNN, self).__init__()
+        HamFinderGNN.__init__(self, graph_updater)
+
         self.PROCESSOR_NAME = f"{self.__class__.__name__}_Processor.tar"
         self.ENCODER_NAME = f"{self.__class__.__name__}_Encoder.tar"
         self.DECODER_NAME = f"{self.__class__.__name__}_Decoder.tar"
@@ -215,7 +219,7 @@ class EncodeProcessDecodeAlgorithm(HamFinderGNN, torch_lightning.LightningModule
 
         self.encoder_nn, self.decoder_nn = self._construct_encoder_and_decoder()
         self.processor_nn = self._construct_processor()
-        self.initial_h = torch.rand(self.hidden_dim, device=self.device)
+        self.initial_h = torch.rand(self.hidden_dim)
 
         if is_load_weights:
             self.load_weights()
@@ -261,44 +265,56 @@ class EncodeProcessDecodeAlgorithm(HamFinderGNN, torch_lightning.LightningModule
     def forward(self, d: torch_g.data.Data):
         return self.next_step_logits_masked_over_neighbors(d)
 
-    def training_step(self, batch_dict):
-        batch_graph = batch_dict["batch_graph"]
-        teacher_paths = batch_dict["teacher_paths"]
+    def training_step(self, graph_batch_example: GraphBatchExample):
+        batch_graph = graph_batch_example.graph_batch
+        teacher_paths = graph_batch_example.teacher_paths
 
         self.init_graph(batch_graph)
         self.prepare_for_first_step(batch_graph, None)
         self.next_step_logits(batch_graph)
-        self.hamilton_nn.prepare_for_first_step(batch_graph, teacher_paths[..., 0])
+        self.prepare_for_first_step(batch_graph, [teacher_path[0] for teacher_path in teacher_paths])
 
         loss = torch.zeros(1) # TODO not sure if this will initialize on the correct device
-        graph_sizes = torch.sum(F.one_hot(self.batch_graph.batch, batch_graph.num_graphs), dim=-1)
-        graph_shifts = graph_sizes.cumsum(0)
-        max_steps = torch.max(graph_sizes, dim=-1) + 1
+        graph_sizes = torch.sum(F.one_hot(batch_graph.batch, batch_graph.num_graphs), dim=0)
+        graph_shifts = graph_sizes.cumsum(0).roll(1)
+        graph_shifts[0] = 0
+        max_steps = torch.max(graph_sizes, dim=-1).values + 1
         for step in range(1, max_steps):
+            active_graphs_index = [index for index in range(len(teacher_paths)) if len(teacher_paths[index]) > step]
+            active_teacher_paths = [teacher_paths[index] for index in active_graphs_index]
+            current_nodes, next_step_nodes = [torch.stack([teacher_path[node_index] for teacher_path in active_teacher_paths])
+                                              for node_index in (step-1, step)]
             if step > 1:
-                self.update_state(batch_graph, teacher_paths[..., step - 1])
-            teacher_paths[..., step]
+                self.update_state(batch_graph, current_nodes)
+
             if self.loss_type == "mse":
                 p = self.next_step_prob_masked_over_neighbors(batch_graph)
-                mse_loss = torch.nn.MSELoss()
-                loss += mse_loss(p, torch.zeros_like(p).index_fill(0, teacher_paths[..., step], 1.))
             elif self.loss_type == "entropy":
                 logits = self.next_step_logits_masked_over_neighbors(batch_graph)
-                entropy_loss = torch.nn.CrossEntropyLoss()
-                for graph_id in range(len(graph_shifts)):
-                    graph_start_index = graph_shifts[graph_id]
-                    graph_end_index = graph_shifts[graph_id+1] if id < len(graph_shifts) else logits.shape[-1]
-                    loss += entropy_loss(logits[graph_start_index: graph_end_index], teacher_paths[..., step] - graph_start_index)
+
+            for graph_index in range(len(graph_shifts)):
+                graph_start_index = graph_shifts[graph_index]
+                graph_end_index = graph_shifts[graph_index+1] if graph_index + 1 < len(graph_shifts) else batch_graph.num_nodes
+                if self.loss_type == "mse":
+                    mse_loss = torch.nn.MSELoss()
+                    _graph_p = p[graph_start_index: graph_end_index]
+                    _teacher_p = torch.zeros_like(_graph_p)
+                    _teacher_p[next_step_nodes[graph_index] - graph_start_index] = 1.
+                    loss += mse_loss(_graph_p, _teacher_p)
+                elif self.loss == "entropy":
+                    entropy_loss = torch.nn.CrossEntropyLoss()
+                    _graph_logits = logits[graph_start_index: graph_end_index]
+                    loss += entropy_loss(_graph_logits, next_step_nodes - graph_start_index)
         return loss
 
-    def validation_step(self, batch_dict):
-        pass
+    # def validation_step(self, batch_dict):
+    #    pass
 
     def predict_step(self, batch_dict):
         pass
 
     def configure_optimizers(self):
-        pass
+        return torch.optim.Adam(self.parameters(), 1e-4)
 
     def save_weights(self, directory=MODEL_WEIGHTS_FOLDER):
         encoder_path, decoder_path, processor_path, initial_hidden_path = self.get_weights_paths(directory)
