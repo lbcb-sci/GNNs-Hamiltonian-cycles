@@ -1,6 +1,6 @@
-from operator import index
 from src.Development_code.Heuristics import LeastDegreeFirstHeuristics, HybridHam
 from src.Evaluation import EvaluationPlots, EvaluationScores
+from src.ExactSolvers import ConcordeHamiltonSolver
 from train import train_HamR, train_HamS
 import time
 import torch
@@ -16,9 +16,10 @@ def test_models_against_heuristics():
     HamR_model = train_HamR(True, 0)
     hybrid_ham_heuristics = HybridHam()
     least_degree_first = LeastDegreeFirstHeuristics()
+    concorde_solver = ConcordeHamiltonSolver()
     df = EvaluationScores.accuracy_scores_on_saved_data(
-        [HamS_model, HamR_model, hybrid_ham_heuristics, least_degree_first],
-        ["HamS", "HamR", "HybridHam", "Least_degree_first"], nr_graphs_per_size=10_000)
+        [HamS_model, HamR_model, hybrid_ham_heuristics, least_degree_first, concorde_solver],
+        ["HamS", "HamR", "HybridHam", "Least_degree_first", "Concorde"], nr_graphs_per_size=10_000)
     df["timestamp"] = timestamp
     return df
 

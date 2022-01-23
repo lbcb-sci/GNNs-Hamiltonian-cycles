@@ -43,7 +43,7 @@ class EvaluationScores:
     def evaluate(solve_graphs, graph_list: List[torch_g.data.Data]):
         walks = solve_graphs(g for g in graph_list)
         is_valid = [not EvaluationScores.is_walk_valid(graph, walk) for graph, walk in zip(graph_list, walks)]
-        is_cycle = [walk[0] == walk[-1] for walk in walks]
+        is_cycle = [len(walk) > 0 and walk[0] == walk[-1] for walk in walks]
         nr_unique_nodes = [len(set(walk)) for walk in walks]
         sizes = [graph.num_nodes for graph in graph_list]
 
@@ -101,7 +101,7 @@ class EvaluationScores:
         return evals
 
     @staticmethod
-    def evaluate_model_on_saved_data(nn_hamilton: HamFinderGNN, nr_graphs_per_size=10, data_folders=None):
+    def evaluate_model_on_saved_data(nn_hamilton: HamFinder, nr_graphs_per_size=10, data_folders=None):
         def _compute_walks_from_graph_list_fn(graph_list):
             return nn_hamilton.solve_graphs(graph_list)
 
