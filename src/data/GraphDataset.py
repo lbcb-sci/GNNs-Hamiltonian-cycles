@@ -20,7 +20,7 @@ class GraphGeneratingDataset(torch.utils.data.Dataset):
     def __init__(self, graph_generator, virtual_epoch_size=1000, ) -> None:
         super().__init__()
         self.graph_generator = iter(graph_generator)
-        self.virtual_epoch_size = 1000
+        self.virtual_epoch_size = virtual_epoch_size
 
     def __len__(self):
         return self.virtual_epoch_size
@@ -43,7 +43,7 @@ class GraphDataLoader(torch.utils.data.DataLoader):
             batch_shift += graph_sizes[index_of_walk]
         graph_batch_example = GraphBatchExample(batched_data, teacher_paths)
         # TODO see if pytorch_lighting can be adjusted to move custom classes from and to devices.
-        # It handles dictionaries of tensors without any problems
+        # It handles dictionaries of tensors without problems
         return {
             "num_nodes": graph_batch_example.graph_batch.num_nodes,
             "edge_index": graph_batch_example.graph_batch.edge_index,

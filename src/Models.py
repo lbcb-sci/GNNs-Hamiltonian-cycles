@@ -265,12 +265,12 @@ class EncodeProcessDecodeAlgorithm(HamFinderGNN, torch_lightning.LightningModule
     def forward(self, d: torch_g.data.Data):
         return self.next_step_logits_masked_over_neighbors(d)
 
-    def training_step(self, graph_batch_example):
+    def training_step(self, graph_batch_dict):
         batch_graph = torch_g.data.Batch()
-        batch_graph.num_nodes = graph_batch_example["num_nodes"]
-        batch_graph.edge_index = graph_batch_example["edge_index"]
-        batch_graph.batch = graph_batch_example["batch_vector"]
-        teacher_paths = graph_batch_example["teacher_paths"]
+        batch_graph.num_nodes = graph_batch_dict["num_nodes"]
+        batch_graph.edge_index = graph_batch_dict["edge_index"]
+        batch_graph.batch = graph_batch_dict["batch_vector"]
+        teacher_paths = graph_batch_dict["teacher_paths"]
 
         self.init_graph(batch_graph)
         self.prepare_for_first_step(batch_graph, None)
@@ -310,8 +310,9 @@ class EncodeProcessDecodeAlgorithm(HamFinderGNN, torch_lightning.LightningModule
                     loss += entropy_loss(_graph_logits, next_step_nodes - graph_start_index)
         return loss
 
-    # def validation_step(self, batch_dict):
-    #    pass
+    def validation_step(self, graph_batch_dict, dataloader_idx):
+        with torch.no_grad():
+            return self.training_step(graph_batch_dict)
 
     def predict_step(self, batch_dict):
         pass
