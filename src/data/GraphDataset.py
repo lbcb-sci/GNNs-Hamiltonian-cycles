@@ -36,19 +36,16 @@ class GraphDataLoader(torch.utils.data.DataLoader):
         graphs = [example.graph for example in graph_examples]
         teacher_paths = [example.teacher_path for example in graph_examples]
         graph_sizes = [graph.num_nodes for graph in graphs]
-        batched_data = torch_geometric.data.Batch.from_data_list(graphs)
         batch_shift = 0
         for index_of_walk, walk in enumerate(teacher_paths):
             walk += batch_shift
             batch_shift += graph_sizes[index_of_walk]
-        graph_batch_example = GraphBatchExample(batched_data, teacher_paths)
         # TODO see if pytorch_lighting can be adjusted to move custom classes from and to devices.
         # It handles dictionaries of tensors without problems
         return {
-            "num_nodes": graph_batch_example.graph_batch.num_nodes,
-            "edge_index": graph_batch_example.graph_batch.edge_index,
-            "batch_vector": graph_batch_example.graph_batch.batch,
-            "teacher_paths": graph_batch_example.teacher_paths,
+            "list_of_edge_indexes": [graph.edge_index for graph in graphs],
+            "list_of_graph_num_nodes": [graph.num_nodes for graph in graphs],
+            "teacher_paths": teacher_paths,
         }
 
     def __init__(self, dataset: GraphGeneratingDataset, *args, **kwargs) -> None:

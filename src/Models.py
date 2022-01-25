@@ -257,6 +257,18 @@ class EncodeProcessDecodeAlgorithm(HamFinderGNN, torch_lightning.LightningModule
     def forward(self, d: torch_g.data.Data):
         return self.next_step_logits_masked_over_neighbors(d)
 
+    def _unpack_graph_batch_dict(self, graph_batch_dict) -> tuple[torch_g.data.Batch, List[List[int]]]:
+        list_of_graph_edge_indexes = graph_batch_dict["list_of_edge_indexes"]
+        list_of_graph_num_nodes = graph_batch_dict["list_of_graph_num_nodes"]
+        teacher_paths = graph_batch_dict.get("teacher_paths")
+        graphs = []
+        for edge_index, num_nodes in zip(list_of_graph_edge_indexes, list_of_graph_num_nodes):
+            graph = torch_g.data.Data(edge_index=edge_index)
+            graph.num_nodes = num_nodes
+            graphs.append(graph)
+        batch_graph = torch_g.data.Batch.from_data_list(graphs)
+        return batch_graph, teacher_paths
+
     def training_step(self, graph_batch_dict):
         batch_graph = torch_g.data.Batch()
         batch_graph.num_nodes = graph_batch_dict["num_nodes"]
