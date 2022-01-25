@@ -157,6 +157,22 @@ class HamFinderGNN(HamiltonSolver):
     def get_batch_size_for_multi_solving(self):
         return self.BATCH_SIZE_DURING_INFERENCE
 
+    def solve_batch_graph(self, batch_graph, subgraph_sizes=None):
+        if subgraph_sizes is None:
+            subgraph_sizes = [g.num_nodes for g in batch_graph.to_data_list()]
+
+        batch_shift = numpy.cumsum([0] + [subgraph_size for subgraph_size in subgraph_sizes[:-1]])
+        walks_tensor, _ = self.batch_run_greedy_neighbor(batch_graph)
+        walks_tensor -= batch_shift[:, None]
+        walks_tensor[walks_tensor < 0] = -1
+        raw_walks = [[int(node.item()) for node in walk] for walk in walks_tensor]
+        walks = []
+        for walk in raw_walks:
+            walk_end_index = walk.index(-1) if -1 in walk else len(walk)
+            walks.append(walk[:walk_end_index])
+        return walks
+
+
     def solve_graphs(self, graphs):
         graph_iterator = iter(graphs)
         batch_size = self.get_batch_size_for_multi_solving()
@@ -165,15 +181,9 @@ class HamFinderGNN(HamiltonSolver):
 
         walks = []
         for list_of_graphs in batch_generator:
-            batch_shift = numpy.cumsum([0] + [g.num_nodes for g in list_of_graphs[:-1]])
+            subgraph_sizes = [g.num_nodes for g in list_of_graphs]
             batch_graph = torch_g.data.Batch.from_data_list(list_of_graphs)
-            walks_tensor, _ = self.batch_run_greedy_neighbor(batch_graph)
-            walks_tensor -= batch_shift[:, None]
-            walks_tensor[walks_tensor < 0] = -1
-            raw_walks = [[int(node.item()) for node in walk] for walk in walks_tensor]
-            for walk in raw_walks:
-                walk_end_index = walk.index(-1) if -1 in walk else len(walk)
-                walks.append(walk[:walk_end_index])
+            walks.extend(self.solve_batch_graph(self, batch_graph, subgraph_sizes))
         return walks
 
 
