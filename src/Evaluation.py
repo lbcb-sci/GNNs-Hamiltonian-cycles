@@ -40,14 +40,18 @@ class EvaluationScores:
         return True
 
     @staticmethod
-    def evaluate(solve_graphs, graph_list: List[torch_g.data.Data]):
-        walks = solve_graphs(g for g in graph_list)
-        is_valid = [not EvaluationScores.is_walk_valid(graph, walk) for graph, walk in zip(graph_list, walks)]
-        is_cycle = [len(walk) > 0 and walk[0] == walk[-1] for walk in walks]
-        nr_unique_nodes = [len(set(walk)) for walk in walks]
-        sizes = [graph.num_nodes for graph in graph_list]
+    def evaluate(graphs: list[torch_g.data.Data], solutions: list[int]):
+        is_valid = [not EvaluationScores.is_walk_valid(graph, walk) for graph, walk in zip(graphs, solutions)]
+        is_cycle = [len(walk) > 0 and walk[0] == walk[-1] for walk in solutions]
+        nr_unique_nodes = [len(set(walk)) for walk in solutions]
+        sizes = [graph.num_nodes for graph in graphs]
 
         return {"is_cycle": is_cycle, "is_valid": is_valid, "length": nr_unique_nodes, "size": sizes}
+
+    @staticmethod
+    def solve_and_evaluate(solve_graphs, graphs: List[torch_g.data.Data]):
+        solutions = solve_graphs(g for g in graphs)
+        EvaluationScores.evaluate(graphs, solutions)
 
     @staticmethod
     def compute_accuracy_scores(evals):
@@ -96,7 +100,7 @@ class EvaluationScores:
         is_hamiltonian = numpy.array([x[1] is not None and len(x[1]) > 0 for x in _get_generator()])
 
         graph_list = [graph for graph, ham_cycle in _get_generator()]
-        evals = EvaluationScores.evaluate(compute_walks_from_graph_list_fn, graph_list)
+        evals = EvaluationScores.solve_and_evaluate(compute_walks_from_graph_list_fn, graph_list)
         evals["is_graph_hamiltonian"] = is_hamiltonian
         return evals
 
