@@ -4,9 +4,9 @@ import itertools
 
 import torch.utils.data
 
-from src.data.GraphGenerators import ErdosRenyiGenerator
-from src.ExactSolvers import ConcordeHamiltonSolver
-
+import src.data.GraphGenerators as GraphGenerators
+import src.data.GraphDataset as GraphDataset
+import src.ExactSolvers as ExactSolvers
 
 class ErdosRenyiInMemoryDataset(torch.utils.data.Dataset):
     GRAPH_TAG = "graph"
@@ -17,17 +17,19 @@ class ErdosRenyiInMemoryDataset(torch.utils.data.Dataset):
     class Transforms:
         @staticmethod
         def graph_and_hamilton_cycle(item):
-            return item[ErdosRenyiInMemoryDataset.GRAPH_TAG], item[ErdosRenyiInMemoryDataset.HAMILTON_CYCLE_TAG]
+            graph = item[ErdosRenyiInMemoryDataset.GRAPH_TAG]
+            cycle = torch.tensor(item[ErdosRenyiInMemoryDataset.HAMILTON_CYCLE_TAG])
+            return GraphDataset.GraphExample(graph, cycle)
 
     @staticmethod
     def create_dataset(out_folder, sizes, nr_examples_per_size=200, hamilton_existence_prob=0.8, number_of_threads=32,
                        solve_with_concorde=True):
         torch.set_num_threads(number_of_threads)
-        concorde = ConcordeHamiltonSolver()
+        concorde = ExactSolvers.ConcordeHamiltonSolver()
         file_index = 1
         for s in sizes:
             data_list = []
-            generator = ErdosRenyiGenerator(num_nodes=s, hamilton_existence_probability=hamilton_existence_prob)
+            generator = GraphGenerators.ErdosRenyiGenerator(num_nodes=s, hamilton_existence_probability=hamilton_existence_prob)
             for g in itertools.islice(generator, nr_examples_per_size):
                 hamilton_cycle = concorde.solve(g) if solve_with_concorde else None
                 item = {ErdosRenyiInMemoryDataset.GRAPH_TAG: g,

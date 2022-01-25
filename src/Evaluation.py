@@ -8,8 +8,8 @@ import torch
 import torch.utils.data
 import torch_geometric as torch_g
 
-from src.DatasetBuilder import ErdosRenyiInMemoryDataset
-from src.Models import HamFinder, HamFinderGNN
+import src.data.InMemoryDataset as InMemoryDataset
+from src.HamiltonSolver import HamiltonSolver
 from src.constants import *
 
 
@@ -88,7 +88,7 @@ class EvaluationScores:
             data_folders = EVALUATION_DATA_FOLDERS
 
         def _get_generator():
-            gen = ErdosRenyiInMemoryDataset(data_folders)
+            gen = InMemoryDataset.ErdosRenyiInMemoryDataset(data_folders)
             if nr_graphs_per_size is not None:
                 gen = EvaluationScores._filtered_generator(nr_graphs_per_size, gen)
             return gen
@@ -101,14 +101,14 @@ class EvaluationScores:
         return evals
 
     @staticmethod
-    def evaluate_model_on_saved_data(nn_hamilton: HamFinder, nr_graphs_per_size=10, data_folders=None):
+    def evaluate_model_on_saved_data(nn_hamilton: HamiltonSolver, nr_graphs_per_size=10, data_folders=None):
         def _compute_walks_from_graph_list_fn(graph_list):
             return nn_hamilton.solve_graphs(graph_list)
 
         return EvaluationScores.evaluate_on_saved_data(_compute_walks_from_graph_list_fn, nr_graphs_per_size, data_folders)
 
     @staticmethod
-    def accuracy_scores_on_saved_data(solvers: List[HamFinder], solver_names: List[str], nr_graphs_per_size=10, data_folders=None, best_possible_score=None):
+    def accuracy_scores_on_saved_data(solvers: List[HamiltonSolver], solver_names: List[str], nr_graphs_per_size=10, data_folders=None, best_possible_score=None):
         evaluations_list = []
         for solver, name in zip(solvers, solver_names):
             evals = EvaluationScores.evaluate_model_on_saved_data(solver, nr_graphs_per_size=nr_graphs_per_size, data_folders=data_folders)

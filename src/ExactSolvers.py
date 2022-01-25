@@ -7,11 +7,11 @@ from typing import List
 
 import torch
 import torch_geometric as torch_g
-from src.Models import HamFinder
+from src.HamiltonSolver import HamiltonSolver
 
 from src.constants import CONCORDE_SCRIPT_PATH, CONCORDE_WORK_DIR, CONCORDE_INPUT_FILE
 
-class ConcordeHamiltonSolver(HamFinder):
+class ConcordeHamiltonSolver(HamiltonSolver):
     def __init__(self, root_dir=CONCORDE_WORK_DIR, working_subdir=""):
         self.CONCORDE_EXECUTABLE_PATH = CONCORDE_SCRIPT_PATH
         self.working_dir = os.path.join(root_dir, working_subdir)

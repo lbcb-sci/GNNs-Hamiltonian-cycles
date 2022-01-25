@@ -3,7 +3,6 @@ import os.path
 from abc import ABC, abstractmethod
 from typing import List
 import numpy
-from sklearn.metrics import mean_squared_log_error
 
 import torch
 import torch.nn.functional as F
@@ -12,10 +11,11 @@ import torch_geometric as torch_g
 import torchinfo
 import pytorch_lightning as torch_lightning
 
+from src.HamiltonSolver import HamiltonSolver
 from src.NN_modules import ResidualMultilayerMPNN, MultilayerGatedGCN
 from src.data.GraphDataset import GraphBatchExample
 from src.constants import MODEL_WEIGHTS_FOLDER
-
+import src.Evaluation as Evaluation
 
 class WalkUpdater:
     @staticmethod
@@ -37,16 +37,8 @@ class WalkUpdater:
         d.x[current_nodes, 2] = 1
 
 
-class HamFinder(ABC):
-    @abstractmethod
-    def solve_graphs(self, graphs: List[torch_g.data.Data]) -> List[List[int]]:
-        pass
 
-    def solve(self, graph: torch_g.data.Data):
-        return self.solve_graphs([graph])[0]
-
-
-class HamFinderGNN(HamFinder):
+class HamFinderGNN(HamiltonSolver):
     def __init__(self, graph_updater: WalkUpdater):
         self.graph_updater = graph_updater
         self.BATCH_SIZE_DURING_INFERENCE = 8

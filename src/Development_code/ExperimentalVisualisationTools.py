@@ -7,7 +7,7 @@ import pandas
 import seaborn
 from matplotlib import pyplot
 
-from src.Models import HamFinderGNN, HamFinder
+from src.Models import HamFinderGNN, HamiltonSolver
 from src.VisualisationTools import display_result_on_known_hamilton_graphs
 from src.Evaluation import EvaluationScores, EvaluationPlots
 from src.Development_code.Heuristics import HybridHam, LeastDegreeFirstHeuristics

@@ -3,7 +3,7 @@ import networkx as nx
 import torch
 from copy import deepcopy
 
-from src.Models import HamFinder
+from src.Models import HamiltonSolver
 
 def _to_networkit(num_nodes, edge_index: torch.tensor):
     g = networkit.Graph(num_nodes)
@@ -55,11 +55,11 @@ def _rotational_options(g, path):
 def _invert_path(path):
     return [path[i] for i in range(len(path) - 1, -1, -1)]
 
-class LeastDegreeFirstHeuristics(HamFinder):
+class LeastDegreeFirstHeuristics(HamiltonSolver):
     def solve_graphs(self, graphs):
-        return [least_degree_first_heuristics(graph.num_nodes, graph.edge_index, True) for graph in graphs] 
+        return [least_degree_first_heuristics(graph.num_nodes, graph.edge_index, True) for graph in graphs]
 
-class HybridHam(HamFinder):
+class HybridHam(HamiltonSolver):
     def solve_graphs(self, graphs):
         return [self._solve(graph.num_nodes, graph.edge_index) for graph in graphs]
 
