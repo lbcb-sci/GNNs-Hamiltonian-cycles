@@ -280,11 +280,7 @@ class EncodeProcessDecodeAlgorithm(HamFinderGNN, torch_lightning.LightningModule
         return batch_graph, teacher_paths
 
     def training_step(self, graph_batch_dict):
-        batch_graph = torch_g.data.Batch()
-        batch_graph.num_nodes = graph_batch_dict["num_nodes"]
-        batch_graph.edge_index = graph_batch_dict["edge_index"]
-        batch_graph.batch = graph_batch_dict["batch_vector"]
-        teacher_paths = graph_batch_dict["teacher_paths"]
+        batch_graph, teacher_paths = self._unpack_graph_batch_dict(graph_batch_dict)
 
         self.init_graph(batch_graph)
         self.prepare_for_first_step(batch_graph, None)
@@ -328,8 +324,18 @@ class EncodeProcessDecodeAlgorithm(HamFinderGNN, torch_lightning.LightningModule
         with torch.no_grad():
             return self.training_step(graph_batch_dict)
 
-    def predict_step(self, batch_dict):
-        pass
+    def predict_step(self, graph_batch_dict, batch_idx):
+        batch_graph, _ = self._unpack_graph_batch_dict(graph_batch_dict)
+        walk_tensors = self.solve_batch_graph(batch_graph)
+        return walk_tensors
+
+    def test_step(self, graph_batch_dict, batch_idx):
+        batch_graph, _ = self._unpack_graph_batch_dict(graph_batch_dict)
+        walks = self.predict_step(graph_batch_dict, batch_idx)
+        graph_list = batch_graph.to_data_list()
+        evaluation = Evaluation.EvaluationScores.evaluate(graph_list, walks)
+        scores = Evaluation.EvaluationScores.compute_accuracy_scores(evaluation)
+        return scores["perc_hamilton_found"]
 
     def configure_optimizers(self):
         return torch.optim.Adam(self.parameters(), 1e-4)
