@@ -10,6 +10,7 @@ import torch_scatter
 import torch_geometric as torch_g
 import torchinfo
 import pytorch_lightning as torch_lightning
+import torchmetrics
 
 from src.HamiltonSolver import HamiltonSolver
 from src.NN_modules import ResidualMultilayerMPNN, MultilayerGatedGCN
@@ -38,10 +39,13 @@ class WalkUpdater:
 
 
 
-class HamFinderGNN(HamiltonSolver):
+class HamFinderGNN(HamiltonSolver, torch_lightning.LightningModule):
     def __init__(self, graph_updater: WalkUpdater):
+        super(HamiltonSolver, self).__init__()
         self.graph_updater = graph_updater
         self.BATCH_SIZE_DURING_INFERENCE = 8
+
+        self.accuracy = torchmetrics.Accuracy()
 
     @abstractmethod
     def next_step_logits(self, d: torch_g.data.Batch) -> torch.Tensor:
@@ -157,20 +161,24 @@ class HamFinderGNN(HamiltonSolver):
     def get_batch_size_for_multi_solving(self):
         return self.BATCH_SIZE_DURING_INFERENCE
 
+    @staticmethod
+    def _conver_batch_walk_tensor_into_solution_list(batch_walks_tensor, graphs_shift_inside_batch):
+        batch_walks_tensor -= graphs_shift_inside_batch[:, None]
+        batch_walks_tensor[batch_walks_tensor < 0] = -1
+        raw_walks = [[int(node.item()) for node in walk] for walk in batch_walks_tensor]
+        walks = []
+        for walk in raw_walks:
+            walk_end_index = walk.index(-1) if -1 in walk else len(walk)
+            walks.append(walk[:walk_end_index])
+        return walks
+
     def solve_batch_graph(self, batch_graph, subgraph_sizes=None):
         if subgraph_sizes is None:
             subgraph_sizes = [g.num_nodes for g in batch_graph.to_data_list()]
 
         batch_shift = numpy.cumsum([0] + [subgraph_size for subgraph_size in subgraph_sizes[:-1]])
         walks_tensor, _ = self.batch_run_greedy_neighbor(batch_graph)
-        walks_tensor -= batch_shift[:, None]
-        walks_tensor[walks_tensor < 0] = -1
-        raw_walks = [[int(node.item()) for node in walk] for walk in walks_tensor]
-        walks = []
-        for walk in raw_walks:
-            walk_end_index = walk.index(-1) if -1 in walk else len(walk)
-            walks.append(walk[:walk_end_index])
-        return walks
+        return self._conver_batch_walk_tensor_into_solution_list(walks_tensor, batch_shift)
 
 
     def solve_graphs(self, graphs):
@@ -185,6 +193,16 @@ class HamFinderGNN(HamiltonSolver):
             batch_graph = torch_g.data.Batch.from_data_list(list_of_graphs)
             walks.extend(self.solve_batch_graph(self, batch_graph, subgraph_sizes))
         return walks
+
+    def update_metrics(self, graphs: list[torch_g.data.Data], solutions: list[list[int]]):
+        evals = Evaluation.EvaluationScores.evaluate(graphs, solutions)
+        df_scores = Evaluation.EvaluationScores.compute_scores(evals)
+        pred_hamiltonian_cycle = torch.tensor(df_scores["is_ham_cycle"])
+        target = torch.ones_like(pred_hamiltonian_cycle)
+        self.accuracy(pred_hamiltonian_cycle, target)
+
+    def _reset_metrics(self):
+        self.accuracy_reset()
 
 
 class HamCycleFinderWithValueFunction(HamFinderGNN):
@@ -333,9 +351,9 @@ class EncodeProcessDecodeAlgorithm(HamFinderGNN, torch_lightning.LightningModule
         batch_graph, _ = self._unpack_graph_batch_dict(graph_batch_dict)
         walks = self.predict_step(graph_batch_dict, batch_idx)
         graph_list = batch_graph.to_data_list()
-        evaluation = Evaluation.EvaluationScores.evaluate(graph_list, walks)
-        scores = Evaluation.EvaluationScores.compute_accuracy_scores(evaluation)
-        return scores["perc_hamilton_found"]
+        self.update_metrics(graph_list, walks)
+        self.log("accuracy", self.accuracy, on_step=True, on_epoch=True)
+        return
 
     def configure_optimizers(self):
         return torch.optim.Adam(self.parameters(), 1e-4)

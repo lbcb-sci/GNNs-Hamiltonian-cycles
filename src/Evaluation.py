@@ -54,7 +54,7 @@ class EvaluationScores:
         EvaluationScores.evaluate(graphs, solutions)
 
     @staticmethod
-    def compute_accuracy_scores(evals):
+    def compute_scores(evals):
         df = pandas.DataFrame.from_dict(evals)
         df["is_ham_cycle"] = (df["length"] == df["size"]) & (df["is_cycle"])
         df["is_ham_path"] = (df["length"] == df["size"]) & (~df["is_cycle"])
@@ -62,6 +62,11 @@ class EvaluationScores:
             = (df["length"] > EvaluationScores.APPROXIMATE_HAMILTON_LOWER_BOUND * df["size"]) & (df["is_cycle"])
         df["is_approx_ham_path"] \
             = (df["length"] > EvaluationScores.APPROXIMATE_HAMILTON_LOWER_BOUND * df["size"]) & (~df["is_cycle"])
+        return df
+
+    @staticmethod
+    def compute_accuracy_scores(evals):
+        df = EvaluationScores.compute_scores(evals)
 
         measurement_columns = ["is_ham_cycle", "is_ham_path", "is_approx_ham_cycle", "is_approx_ham_path"]
         scores = df[["size"] + measurement_columns].groupby("size").aggregate({name: "mean" for name in measurement_columns}).reset_index()
