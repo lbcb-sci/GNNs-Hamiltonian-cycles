@@ -38,14 +38,17 @@ class WalkUpdater:
         d.x[current_nodes, 2] = 1
 
 
-
 class HamFinderGNN(HamiltonSolver, torch_lightning.LightningModule):
     def __init__(self, graph_updater: WalkUpdater):
         super(HamiltonSolver, self).__init__()
         self.graph_updater = graph_updater
         self.BATCH_SIZE_DURING_INFERENCE = 8
 
-        self.accuracy = torchmetrics.Accuracy()
+        self.validation_accuracy_metrics, self.test_accuracy_metrics = \
+            [torch.nn.ModuleDict({
+                name: torchmetrics.Accuracy(compute_on_step=False)
+                for name in ("hamiltonian_cycle", "hamiltonian_path", "90_perc_cycle", "90_perc_path")}
+                                 ) for _ in range(2)]
 
     @abstractmethod
     def next_step_logits(self, d: torch_g.data.Batch) -> torch.Tensor:
@@ -194,15 +197,15 @@ class HamFinderGNN(HamiltonSolver, torch_lightning.LightningModule):
             walks.extend(self.solve_batch_graph(self, batch_graph, subgraph_sizes))
         return walks
 
-    def update_metrics(self, graphs: list[torch_g.data.Data], solutions: list[list[int]]):
+    def update_accuracy_metrics(self, accuracy_metrics_dict: dict[str, torchmetrics.Accuracy], graphs: list[torch_g.data.Data], solutions: list[list[int]]):
         evals = Evaluation.EvaluationScores.evaluate(graphs, solutions)
         df_scores = Evaluation.EvaluationScores.compute_scores(evals)
-        pred_hamiltonian_cycle = torch.tensor(df_scores["is_ham_cycle"])
-        target = torch.ones_like(pred_hamiltonian_cycle)
-        self.accuracy(pred_hamiltonian_cycle, target)
-
-    def _reset_metrics(self):
-        self.accuracy_reset()
+        for metric_name, column_name in [("hamiltonian_cycle", "is_ham_cycle"), ("hamiltonian_path", "is_ham_path"),
+                                         ("90_perc_cycle", "is_approx_ham_cycle"), ("90_perc_path", "is_approx_ham_path")]:
+            if metric_name in accuracy_metrics_dict:
+                metric = accuracy_metrics_dict[metric_name]
+                prediction = torch.tensor(df_scores[column_name], dtype=torch.float)
+                metric(prediction, torch.ones_like(prediction, dtype=torch.int))
 
 
 class HamCycleFinderWithValueFunction(HamFinderGNN):
@@ -336,11 +339,23 @@ class EncodeProcessDecodeAlgorithm(HamFinderGNN, torch_lightning.LightningModule
                     entropy_loss = torch.nn.CrossEntropyLoss()
                     _graph_logits = logits[graph_start_index: graph_end_index]
                     loss += entropy_loss(_graph_logits, next_step_nodes - graph_start_index)
+        self.log("train/loss", loss)
         return loss
 
     def validation_step(self, graph_batch_dict, dataloader_idx):
         with torch.no_grad():
-            return self.training_step(graph_batch_dict)
+            batch_graph, _ = self._unpack_graph_batch_dict(graph_batch_dict)
+            loss = self.training_step(graph_batch_dict)
+            self.log("validation/loss", loss)
+            solutions = self.solve_batch_graph(batch_graph)
+            self.update_accuracy_metrics(self.validation_accuracy_metrics, batch_graph.to_data_list(), solutions)
+            return loss
+
+    def on_validation_epoch_end(self) -> None:
+        for metric_name, metric in self.validation_accuracy_metrics.items():
+            self.log(f"validation/{metric_name}", metric)
+            metric.reset()
+        return super().on_validation_epoch_end()
 
     def predict_step(self, graph_batch_dict, batch_idx):
         batch_graph, _ = self._unpack_graph_batch_dict(graph_batch_dict)
@@ -351,9 +366,13 @@ class EncodeProcessDecodeAlgorithm(HamFinderGNN, torch_lightning.LightningModule
         batch_graph, _ = self._unpack_graph_batch_dict(graph_batch_dict)
         walks = self.predict_step(graph_batch_dict, batch_idx)
         graph_list = batch_graph.to_data_list()
-        self.update_metrics(graph_list, walks)
-        self.log("accuracy", self.accuracy, on_step=True, on_epoch=True)
-        return
+        self.update_accuracy_metrics(self.test_accuracy_metrics, graph_list, walks)
+
+    def on_test_epoch_end(self) -> None:
+        for metric_name, metric in self.test_accuracy_metrics.items():
+            self.log(f"test/{metric_name}", metric)
+            metric.reset()
+        return super().on_test_epoch_end()
 
     def configure_optimizers(self):
         return torch.optim.Adam(self.parameters(), 1e-4)
