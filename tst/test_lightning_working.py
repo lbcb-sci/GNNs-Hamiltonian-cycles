@@ -2,6 +2,7 @@ import torch
 from torch.utils.data import DataLoader
 import pytorch_lightning as torch_lightning
 from pytorch_lightning.loggers import WandbLogger
+import pytorch_lightning.callbacks
 import wandb
 import copy
 
@@ -16,10 +17,12 @@ if __name__ == "__main__":
     torch.set_num_threads(32)
     wandb.init(project="gnns-Hamiltonian-cycles", mode="disabled")
     wandb_logger = WandbLogger()
+    checkpoint_saving_dir = "checkpoints"
 
     datamodule = ArtificialCycleDataModule()
     model = Models.EncodeProcessDecodeAlgorithm(is_load_weights=False, loss_type="entropy", processor_depth=5, hidden_dim=32)
-    trainer = torch_lightning.Trainer(max_epochs=500, num_sanity_val_steps=2, check_val_every_n_epoch=2, logger=wandb_logger)
+    checkpoint_callback = torch_lightning.callbacks.ModelCheckpoint(monitor="validation/loss", dirpath=checkpoint_saving_dir)
+    trainer = torch_lightning.Trainer(max_epochs=3, num_sanity_val_steps=2, check_val_every_n_epoch=2, callbacks=[checkpoint_callback], logger=wandb_logger)
 
     trainer.fit(model=model, datamodule=datamodule)
 
@@ -34,5 +37,9 @@ if __name__ == "__main__":
             test_dataloaders.append(subset_dataloader)
     else:
         test_dataloaders = [dataloader]
+
+    best_model_path = checkpoint_callback.best_model_path
+    print(best_model_path)
+    model = Models.EncodeProcessDecodeAlgorithm.load_from_checkpoint(best_model_path)
 
     trainer.test(model, dataloaders=test_dataloaders[1])

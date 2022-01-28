@@ -224,9 +224,11 @@ class EncodeProcessDecodeAlgorithm(HamFinderGNN, torch_lightning.LightningModule
         decoder_nn = torch.nn.Sequential(torch.nn.Linear(self.hidden_dim + self.hidden_dim, self.out_dim))
         return encoder_nn, decoder_nn
 
-    def __init__(self, is_load_weights=True, processor_depth=3, in_dim=1, out_dim=1, hidden_dim=32, graph_updater=WalkUpdater(), loss_type="mse"):
+    def __init__(self, is_load_weights=False, processor_depth=3, in_dim=1, out_dim=1, hidden_dim=32, graph_updater=WalkUpdater(), loss_type="mse"):
         super(HamFinderGNN, self).__init__()
         HamFinderGNN.__init__(self, graph_updater)
+
+        self.save_hyperparameters()
 
         self.PROCESSOR_NAME = f"{self.__class__.__name__}_Processor.tar"
         self.ENCODER_NAME = f"{self.__class__.__name__}_Encoder.tar"
@@ -246,6 +248,14 @@ class EncodeProcessDecodeAlgorithm(HamFinderGNN, torch_lightning.LightningModule
 
         if is_load_weights:
             self.load_weights()
+
+
+    # def on_load_checkpoint(self, checkpoint) -> None:
+    #     _processor_depth_varname = "processor_depth"
+    #     if _processor_depth_varname in checkpoint:
+    #         self.processor_depth = checkpoint[_processor_depth_varname]
+    #         self._construct_processor()
+
 
     def description(self):
         return f"encoder: {torchinfo.summary(self.encoder_nn, verbose=0, depth=5)}\n" \
