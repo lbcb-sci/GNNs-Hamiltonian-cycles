@@ -55,14 +55,14 @@ class SupervisedTrainFollowingHamiltonCycle(TrainAlgorithm):
 
     def _compute_loss(self, d, teacher_paths, teacher_distributions, hamilton_nn: HamFinderGNN):
         assert teacher_paths is not None
-        d = d.to(hamilton_nn.get_device())
-        teacher_paths = teacher_paths.to(hamilton_nn.get_device())
+        #d = d.to(hamilton_nn.get_device())
+        #teacher_paths = teacher_paths.to(hamilton_nn.get_device())
         hamilton_nn.init_graph(d)
         hamilton_nn.prepare_for_first_step(d, None)
         hamilton_nn.next_step_logits(d)
         hamilton_nn.prepare_for_first_step(d, teacher_paths[..., 0])
 
-        loss = torch.zeros(1, device=hamilton_nn.get_device())
+        loss = torch.zeros(1, device="cpu")
         for step in range(1, d.num_nodes // d.num_graphs + 1):
             if step > 1:
                 hamilton_nn.update_state(d, teacher_paths[..., step - 1])

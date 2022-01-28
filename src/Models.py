@@ -205,7 +205,7 @@ class HamFinderGNN(HamiltonSolver, torch_lightning.LightningModule):
             if metric_name in accuracy_metrics_dict:
                 metric = accuracy_metrics_dict[metric_name]
                 prediction = torch.tensor(df_scores[column_name], dtype=torch.float)
-                metric(prediction, torch.ones_like(prediction, dtype=torch.int))
+                metric.update(prediction, torch.ones_like(prediction, dtype=torch.int))
 
 
 class HamCycleFinderWithValueFunction(HamFinderGNN):
@@ -322,10 +322,11 @@ class EncodeProcessDecodeAlgorithm(HamFinderGNN, torch_lightning.LightningModule
                 self.update_state(batch_graph, current_nodes)
 
             if self.loss_type == "mse":
-                p = self.next_step_prob_masked_over_neighbors(batch_graph)
+                p = self.next_step_prob(batch_graph)
             elif self.loss_type == "entropy":
-                logits = self.next_step_logits_masked_over_neighbors(batch_graph)
+                logits = self.next_step_logits(batch_graph)
 
+            subgraph_losses = []
             for graph_index in range(len(graph_shifts)):
                 graph_start_index = graph_shifts[graph_index]
                 graph_end_index = graph_shifts[graph_index+1] if graph_index + 1 < len(graph_shifts) else batch_graph.num_nodes
@@ -335,10 +336,12 @@ class EncodeProcessDecodeAlgorithm(HamFinderGNN, torch_lightning.LightningModule
                     _teacher_p = torch.zeros_like(_graph_p)
                     _teacher_p[next_step_nodes[graph_index] - graph_start_index] = 1.
                     loss += mse_loss(_graph_p, _teacher_p)
-                elif self.loss == "entropy":
+                elif self.loss_type == "entropy":
                     entropy_loss = torch.nn.CrossEntropyLoss()
-                    _graph_logits = logits[graph_start_index: graph_end_index]
-                    loss += entropy_loss(_graph_logits, next_step_nodes - graph_start_index)
+                    _graph_logits = logits[graph_start_index: graph_end_index].unsqueeze(0)
+                    subgraph_losses.append(entropy_loss(_graph_logits, next_step_nodes[graph_index:graph_index + 1] - graph_start_index))
+            loss += torch.stack(subgraph_losses).sum()
+        loss = loss / (max_steps * len(graph_sizes))
         self.log("train/loss", loss)
         return loss
 
@@ -353,7 +356,7 @@ class EncodeProcessDecodeAlgorithm(HamFinderGNN, torch_lightning.LightningModule
 
     def on_validation_epoch_end(self) -> None:
         for metric_name, metric in self.validation_accuracy_metrics.items():
-            self.log(f"validation/{metric_name}", metric)
+            self.log(f"validation/{metric_name}", metric.compute())
             metric.reset()
         return super().on_validation_epoch_end()
 
@@ -370,7 +373,7 @@ class EncodeProcessDecodeAlgorithm(HamFinderGNN, torch_lightning.LightningModule
 
     def on_test_epoch_end(self) -> None:
         for metric_name, metric in self.test_accuracy_metrics.items():
-            self.log(f"test/{metric_name}", metric)
+            self.log(f"test/{metric_name}", metric.compute())
             metric.reset()
         return super().on_test_epoch_end()
 
