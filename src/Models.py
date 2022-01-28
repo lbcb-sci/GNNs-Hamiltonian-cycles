@@ -365,7 +365,7 @@ class EncodeProcessDecodeAlgorithm(HamFinderGNN, torch_lightning.LightningModule
         walk_tensors = self.solve_batch_graph(batch_graph)
         return walk_tensors
 
-    def test_step(self, graph_batch_dict, batch_idx):
+    def test_step(self, graph_batch_dict, batch_idx, dataloader_idx=None):
         batch_graph, _ = self._unpack_graph_batch_dict(graph_batch_dict)
         walks = self.predict_step(graph_batch_dict, batch_idx)
         graph_list = batch_graph.to_data_list()
