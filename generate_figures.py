@@ -1,7 +1,8 @@
 import torch_geometric as torch_g
 from matplotlib import pyplot as plt
-from src.DatasetBuilder import ErdosRenyiInMemoryDataset
+from src.data.InMemoryDataset import ErdosRenyiInMemoryDataset
 from src.VisualisationTools import display_ER_graph, display_result_on_known_hamilton_graphs
+
 
 if __name__ == '__main__':
     from train import train_HamS, EVALUATION_DATA_FOLDERS

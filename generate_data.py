@@ -1,6 +1,7 @@
-from src.DatasetBuilder import ErdosRenyiInMemoryDataset
+from src.data.InMemoryDataset import ErdosRenyiInMemoryDataset
 from src.constants import EVALUATION_DATA_FOLDERS, DEFAULT_DATASET_SIZES, DEFAULT_EXAMPLES_PER_SIZE_IN_DATASET,\
     HAMILTONIAN_PROBABILITY
+
 
 if __name__ == '__main__':
     assert len(EVALUATION_DATA_FOLDERS)

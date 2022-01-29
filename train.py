@@ -5,7 +5,7 @@ import torch.multiprocessing as mp
 
 from src.Models import EncodeProcessDecodeAlgorithm, GatedGCNEmbedAndProcess, MODEL_WEIGHTS_FOLDER
 from src.Trainers import SupervisedTrainFollowingHamiltonCycle, REINFORCE_WithLearnableBaseline
-from src.GraphGenerators import ErdosRenyiGenerator, NoisyCycleBatchGenerator
+from src.data.GraphGenerators import ErdosRenyiGenerator, NoisyCycleBatchGenerator
 from src.Evaluation import EvaluationScores
 from src.constants import HAMILTONIAN_PROBABILITY, MAX_NR_BATCHES_TO_USE_FOR_EVALUATION, EVALUATION_DATA_FOLDERS
 
