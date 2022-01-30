@@ -38,7 +38,7 @@ class ArtificialCycleDataModule(TestWithLocalDatasetDataLoader):
 
     def train_dataloader(self):
         generator = NoisyCycleGenerator(self.train_graph_size, self.train_noise_prob_per_edge)
-        return GraphDataLoader(GraphGeneratingDataset(generator, 700), batch_size=self.train_batch_size)
+        return GraphDataLoader(GraphGeneratingDataset(generator, 70), batch_size=self.train_batch_size)
 
     def val_dataloader(self):
         generator = NoisyCycleGenerator(self.val_graph_size, self.val_noise_prob_per_edge)

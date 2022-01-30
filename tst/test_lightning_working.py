@@ -22,7 +22,7 @@ if __name__ == "__main__":
     datamodule = ArtificialCycleDataModule()
     model = Models.EncodeProcessDecodeAlgorithm(is_load_weights=False, loss_type="entropy", processor_depth=5, hidden_dim=32)
     checkpoint_callback = torch_lightning.callbacks.ModelCheckpoint(monitor="validation/loss", dirpath=checkpoint_saving_dir)
-    trainer = torch_lightning.Trainer(max_epochs=3, num_sanity_val_steps=2, check_val_every_n_epoch=2, callbacks=[checkpoint_callback], logger=wandb_logger)
+    trainer = torch_lightning.Trainer(max_epochs=2, num_sanity_val_steps=2, check_val_every_n_epoch=2, callbacks=[checkpoint_callback], logger=wandb_logger)
 
     trainer.fit(model=model, datamodule=datamodule)
 
