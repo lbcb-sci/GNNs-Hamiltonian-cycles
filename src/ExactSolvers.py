@@ -52,6 +52,7 @@ class ConcordeHamiltonSolver(HamiltonSolver):
         with open(filename, "w") as out:
             out.write(out_string)
 
+    # INPUT FILE CREATION TAKES A LONG TIME (QUADRATIC COMPLEXITY) SO THE RESULTS CAN BE UNINTUITIVE!
     def time_execution(self, d: torch_g.data.Data, input_file=None, is_consume_input_file=False):
         if input_file is None:
             self.create_input_file(d)
