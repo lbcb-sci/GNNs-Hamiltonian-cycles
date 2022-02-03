@@ -40,7 +40,7 @@ class WalkUpdater:
 
 class HamFinderGNN(HamiltonSolver, torch_lightning.LightningModule):
     def __init__(self, graph_updater: WalkUpdater):
-        super(HamiltonSolver, self).__init__()
+        super(HamFinderGNN, self).__init__()
         self.graph_updater = graph_updater
         self.BATCH_SIZE_DURING_INFERENCE = 8
 
@@ -183,7 +183,6 @@ class HamFinderGNN(HamiltonSolver, torch_lightning.LightningModule):
         walks_tensor, _ = self.batch_run_greedy_neighbor(batch_graph)
         return self._conver_batch_walk_tensor_into_solution_list(walks_tensor, batch_shift)
 
-
     def solve_graphs(self, graphs):
         graph_iterator = iter(graphs)
         batch_size = self.get_batch_size_for_multi_solving()
@@ -214,7 +213,7 @@ class HamCycleFinderWithValueFunction(HamFinderGNN):
         pass
 
 
-class EncodeProcessDecodeAlgorithm(HamFinderGNN, torch_lightning.LightningModule):
+class EncodeProcessDecodeAlgorithm(HamFinderGNN):
     def _construct_processor(self):
         return ResidualMultilayerMPNN(dim=self.hidden_dim, message_dim=self.hidden_dim, edges_dim=1,
                                       nr_layers=self.processor_depth)
@@ -225,8 +224,7 @@ class EncodeProcessDecodeAlgorithm(HamFinderGNN, torch_lightning.LightningModule
         return encoder_nn, decoder_nn
 
     def __init__(self, is_load_weights=False, processor_depth=3, in_dim=1, out_dim=1, hidden_dim=32, graph_updater=WalkUpdater(), loss_type="mse"):
-        super(HamFinderGNN, self).__init__()
-        HamFinderGNN.__init__(self, graph_updater)
+        super().__init__(graph_updater)
 
         self.save_hyperparameters()
 
@@ -276,10 +274,10 @@ class EncodeProcessDecodeAlgorithm(HamFinderGNN, torch_lightning.LightningModule
                 module.load_state_dict(torch.load(path))
                 print("Loaded {} from {}".format(module.__class__.__name__, path))
         if os.path.isfile(initial_hidden_path):
-            self.initial_h = torch.load(initial_hidden_path)
-            self.initial_h = self.initial_h.to(self.device)
+            self.initial_h = torch.nn.Parameter(torch.load(initial_hidden_path))
+            # self.initial_h = self.initial_h.to(self.device)
         else:
-            self.initial_h = torch.rand(self.hidden_dim, device=self.device)
+            self.initial_h = torch.nn.Parameter(torch.rand(self.hidden_dim, device=self.device))
 
     def parameters(self):
         return itertools.chain(self.encoder_nn.parameters(), self.decoder_nn.parameters(),
@@ -411,8 +409,10 @@ class EmbeddingAndMaxMPNN(HamCycleFinderWithValueFunction):
         return processor, processor_out_projection
 
     def __init__(self, is_load_weights=True, in_dim=3, out_dim=2, hidden_dim=32, embedding_depth=5, processor_depth=5,
-                 device="cpu", graph_updater=WalkUpdater()):
-        super(EmbeddingAndMaxMPNN, self).__init__(graph_updater)
+                 loss_type="mse", graph_updater=WalkUpdater()):
+        super().__init__(graph_updater)
+        self.save_hyperparameters()
+
         self.EMBEDDING_NAME = "{}-Embedding.tar".format(self.__class__.__name__)
         self.PROCESSOR_NAME = "{}-Processor.tar".format(self.__class__.__name__)
 
@@ -422,29 +422,25 @@ class EmbeddingAndMaxMPNN(HamCycleFinderWithValueFunction):
         self.processor_depth = processor_depth
         assert hidden_dim > 3
         self.hidden_dim = hidden_dim
-        self.device = device
         self.softmax = torch.nn.Softmax(dim=0)
-        self.initial_embedding = torch.rand([hidden_dim], device=self.device, requires_grad=True)
+        self.initial_embedding = torch.nn.Parameter(torch.rand([hidden_dim], requires_grad=True))
         self.embedding, self.embedding_out_projection = self._construct_embedding()
         self.processor, self.processor_out_projection = self._construct_processor()
-
-        if device == "cuda":
-            self.to_cuda()
 
         if is_load_weights:
             self.load_weights()
 
-    def to(self, device):
-        for module in [self.embedding, self.embedding_out_projection, self.processor, self.processor_out_projection]:
-            module.to(device)
-        self.initial_embedding = self.initial_embedding.to(device)
-        self.device = device
+    # def to(self, device):
+    #     for module in [self.embedding, self.embedding_out_projection, self.processor, self.processor_out_projection]:
+    #         module.to(device)
+    #     self.initial_embedding = self.initial_embedding.to(device)
+    #     self.device = device
 
-    def to_cuda(self):
-        self.initial_embedding.to("cuda")
-        for module in [self.embedding, self.embedding_out_projection, self.processor, self.processor_out_projection]:
-            module.cuda()
-        self.device = "cuda"
+    # def to_cuda(self):
+    #     self.initial_embedding.to("cuda")
+    #     for module in [self.embedding, self.embedding_out_projection, self.processor, self.processor_out_projection]:
+    #         module.cuda()
+    #     self.device = "cuda"
 
     def embed(self, d: torch_g.data.Data()):
         d.emb = self.embedding_out_projection(
@@ -468,11 +464,11 @@ class EmbeddingAndMaxMPNN(HamCycleFinderWithValueFunction):
             return logits, value_estimate
 
     def init_graph(self, d) -> None:
-        d.edge_attr = torch.ones([d.edge_index.shape[1], 1], device=self.device)
+        d.edge_attr = torch.ones([d.edge_index.shape[1], 1])
         self.embed(d)
 
-    def get_device(self) -> str:
-        return self.device
+    # def get_device(self) -> str:
+    #     return self.device
 
     def parameters(self):
         return itertools.chain([self.initial_embedding], self.embedding.parameters(),
@@ -490,7 +486,7 @@ class EmbeddingAndMaxMPNN(HamCycleFinderWithValueFunction):
         embedding_path, processor_path = self.get_weights_paths(directory)
         if os.path.isfile(embedding_path):
             embedding_save_data = torch.load(embedding_path)
-            self.initial_embedding = embedding_save_data["initial"]["initial"]
+            self.initial_embedding = torch.nn.Parameter(embedding_save_data["initial"]["initial"])
             for module_key, module in zip(["MPNN", "out_projection"], [self.embedding, self.embedding_out_projection]):
                 module.load_state_dict(embedding_save_data[module_key])
             print("Loaded embedding module from {}".format(embedding_path))
@@ -537,5 +533,17 @@ class GatedGCNEmbedAndProcess(EmbeddingAndMaxMPNN):
         return self.processor_out_projection(x)
 
     def init_graph(self, d) -> None:
-        d.edge_attr = torch.ones([d.edge_index.shape[1], self.hidden_dim], device=self.device)
+        d.edge_attr = torch.ones([d.edge_index.shape[1], self.hidden_dim])
         self.embed(d)
+
+    def training_step(self, *args, **kwargs):
+        return super().training_step(*args, **kwargs)
+
+    def configure_optimizers(self):
+        return torch.optim.Adam(self.parameters(), 1e-5)
+    # def __init__(self, nr_epochs, iterations_in_epoch, episodes_per_example=1, scorer=CombinatorialScorer(1, -1, 2, 1),
+    #              l2_regularization_weight=0.01, value_function_weight=1,
+    #              simulation_batch_size=8, verbose=1, max_simulation_steps=None):
+    # HamR_trainer = REINFORCE_WithLearnableBaseline(nr_epochs=train_epochs, iterations_in_epoch=100,
+    #                                                episodes_per_example=1, simulation_batch_size=1)
+    #     return super().configure_optimizers()
