@@ -450,12 +450,6 @@ class EmbeddingAndMaxMPNN(HamCycleFinderWithValueFunction):
     #         module.cuda()
     #     self.device = "cuda"
 
-    def clone(self):
-        clone = self.__class__(**self.hparams)
-        for original_param, clone_param in zip(self.parameters(), clone.parameters()):
-            clone_param.data.copy_(original_param).detach_()
-        return clone
-
     def embed(self, d: torch_g.data.Data()):
         d.emb = self.embedding_out_projection(
             self.embedding.forward(torch.unsqueeze(self.initial_embedding, 0).expand(d.num_nodes, -1),

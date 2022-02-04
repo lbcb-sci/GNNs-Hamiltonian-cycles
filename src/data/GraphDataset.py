@@ -112,10 +112,15 @@ class SimulationsDataset(torch.utils.data.DataLoader):
         self.nr_simulatneous_simulations = nr_simultaneous_simulations
         self.simulations_count = 0
         self.simulations_storage = deque()
-        self._update_simulation_model()
+        self._create_module_copy_for_simulation()
+        self._cupdate_weights_of_simulation_model()
 
-    def _update_simulation_model(self):
-        self._module_for_simulations = self.original_module.clone()
+    def _cupdate_weights_of_simulation_model(self):
+        for original_param, for_simulation_param in zip(self.original_module.parameters(), self._module_for_simulations.parameters()):
+            for_simulation_param.data.copy_(original_param).detach_()
+
+    def _create_module_copy_for_simulation(self):
+        self._module_for_simulations = self.original_module.__class__(**self.original_module.hparams)
 
     def __len__(self):
         return self.virtual_epoch_size
@@ -126,7 +131,7 @@ class SimulationsDataset(torch.utils.data.DataLoader):
 
         if self.simulations_count >= self.update_simulation_module_after_n_steps:
             self.simulations_count = 0
-            self._update_simulation_model()
+            self._cupdate_weights_of_simulation_model()
 
         simulation_data = self._module_for_simulations._run_episode(next(iter(self.graph_generator)))
         self.simulations_storage.extend(simulation_data)
