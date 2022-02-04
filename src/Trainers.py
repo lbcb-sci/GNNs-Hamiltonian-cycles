@@ -167,7 +167,7 @@ class CombinatorialScorer(ReinforcementScorer):
         x = d.x.reshape([d.num_graphs, -1, 3])
 
         choices_mask = torch.zeros_like(d.x[..., 2]).scatter_(0, choices, 1).reshape([d.num_graphs, -1])
-        valid_next_steps_mask = HamFinderGNN._neighbor_mask(d).reshape([d.num_graphs, -1])
+        valid_next_steps_mask = HamFinderGNN._neighbor_indices(d).reshape([d.num_graphs, -1])
         illegal_next_step_mask = torch.logical_not(torch.minimum(valid_next_steps_mask, choices_mask).any())
 
         cycle_mask = torch.minimum(x[..., 0], choices_mask).any(dim=-1)

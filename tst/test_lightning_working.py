@@ -4,22 +4,40 @@ import pytorch_lightning as torch_lightning
 from pytorch_lightning.loggers import WandbLogger
 import pytorch_lightning.callbacks
 import wandb
-import copy
+from pathlib import Path
 
 import src.Models as Models
 from src.data.InMemoryDataset import ErdosRenyiInMemoryDataset
 from src.data.GraphGenerators import NoisyCycleGenerator
 from src.data.GraphDataset import GraphDataLoader, GraphGeneratingDataset
-from src.data.DataModules import ArtificialCycleDataModule
+from src.data.DataModules import ArtificialCycleDataModule, ErdosRenyiInMemoryDataset, ReinforcementErdosRenyiDataModule
+
+
+def check_existing_models_training(weights_dir_path=Path("new_weights")):
+    torch.set_num_threads(8)
+
+    # HamS = Models.EncodeProcessDecodeAlgorithm.load_from_checkpoint(weights_dir_path / "lightning_HamS.ckpt")
+    # HamS_datamodule = ArtificialCycleDataModule()
+    # HamS_trainer = torch_lightning.Trainer(max_epochs=2, num_sanity_val_steps=2)
+    # HamS_trainer.fit(HamS, datamodule=HamS_datamodule)
+
+    HamR = Models.GatedGCNEmbedAndProcess.load_from_checkpoint(weights_dir_path / "lightning_HamR.ckpt")
+    HamR_datamodule = ReinforcementErdosRenyiDataModule(HamR)
+    HamR_trainer = torch_lightning.Trainer(max_epochs=10, num_sanity_val_steps=2)
+    HamR_trainer.fit(HamR, datamodule=HamR_datamodule)
 
 
 if __name__ == "__main__":
     torch.set_num_threads(32)
+    check_existing_models_training()
+    exit()
+
     wandb.init(project="gnns-Hamiltonian-cycles", mode="disabled")
     wandb_logger = WandbLogger()
     checkpoint_saving_dir = "checkpoints"
 
     datamodule = ArtificialCycleDataModule()
+
     model = Models.EncodeProcessDecodeAlgorithm(is_load_weights=False, loss_type="entropy", processor_depth=5, hidden_dim=32)
     checkpoint_callback = torch_lightning.callbacks.ModelCheckpoint(monitor="validation/loss", dirpath=checkpoint_saving_dir)
     trainer = torch_lightning.Trainer(max_epochs=2, num_sanity_val_steps=2, check_val_every_n_epoch=2, callbacks=[checkpoint_callback], logger=wandb_logger)
