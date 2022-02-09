@@ -353,10 +353,13 @@ class EncodeProcessDecodeAlgorithm(HamFinderGNN):
             if os.path.isfile(path):
                 module.load_state_dict(torch.load(path))
                 print("Loaded {} from {}".format(module.__class__.__name__, path))
+            else:
+                print(f"Failed to load parameters from {path}")
         if os.path.isfile(initial_hidden_path):
             self.initial_h = torch.nn.Parameter(torch.load(initial_hidden_path))
             # self.initial_h = self.initial_h.to(self.device)
         else:
+            print(f"Faliled to load parameters from {path}")
             self.initial_h = torch.nn.Parameter(torch.rand(self.hidden_dim, device=self.device))
 
     def parameters(self):
@@ -391,10 +394,10 @@ class EncodeProcessDecodeAlgorithm(HamFinderGNN):
                 self.teacher_tensor = torch.stack(teacher_paths, 0)
 
                 if self.gnn_model.loss_type == "mse":
-                    mse_weights = F.normalize(_batch_graph_one_hot, 1, -1).sum(-1)
+                    mse_weights = F.normalize(_batch_graph_one_hot.float(), 1, 0).sum(-1)
                     def _compute_loss(logits, probabilities, step_number, is_algorithm_stopped_mask):
                         mse_loss = torch.nn.MSELoss(reduction="none")
-                        teacher_p = torch.zeroslike(probabilities)
+                        teacher_p = torch.zeros_like(probabilities)
                         teacher_p[self.teacher_tensor[:, step_number + 1]] = 1
                         return (mse_loss(probabilities, teacher_p) * mse_weights).sum()
                 elif self.gnn_model.loss_type == "entropy":
@@ -705,11 +708,15 @@ class EmbeddingAndMaxMPNN(HamCycleFinderWithValueFunction):
             for module_key, module in zip(["MPNN", "out_projection"], [self.embedding, self.embedding_out_projection]):
                 module.load_state_dict(embedding_save_data[module_key])
             print("Loaded embedding module from {}".format(embedding_path))
+        else:
+            print(f"Failed to load embedding from {embedding_path}")
         if os.path.isfile(processor_path):
             processor_save_data = torch.load(processor_path)
             for modul_key, module in zip(["MPNN", "out_projection"], [self.processor, self.processor_out_projection]):
                 module.load_state_dict(processor_save_data[modul_key])
             print("Loaded processor module from {}".format(processor_path))
+        else:
+            print(f"Failed to load processor from {processor_path}")
 
     def save_weights(self, directory=MODEL_WEIGHTS_FOLDER):
         embedding_path, processor_path = self.get_weights_paths(directory)
