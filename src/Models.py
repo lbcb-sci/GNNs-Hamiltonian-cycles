@@ -171,7 +171,7 @@ class HamFinderGNN(HamiltonSolver, torch_lightning.LightningModule):
 
         start_step_number = run_instructions.on_algorithm_start_fn(batch_graph)
 
-        for step_number in range(start_step_number, max_steps_in_a_cycle - 1):
+        for step_number in range(start_step_number, max_steps_in_a_cycle):
             if step_number in [0, 1]:
                 self.prepare_for_first_step(batch_graph, current_nodes)
             else:
@@ -398,7 +398,7 @@ class EncodeProcessDecodeAlgorithm(HamFinderGNN):
                     def _compute_loss(logits, probabilities, step_number, is_algorithm_stopped_mask):
                         mse_loss = torch.nn.MSELoss(reduction="none")
                         teacher_p = torch.zeros_like(probabilities)
-                        teacher_p[self.teacher_tensor[:, step_number + 1]] = 1
+                        teacher_p[self.teacher_tensor[:, step_number]] = 1
                         return (mse_loss(probabilities, teacher_p) * mse_weights).sum()
                 elif self.gnn_model.loss_type == "entropy":
                     def _compute_loss(logits, probabilites, step_number, is_algorithm_stopped_mask):
@@ -427,7 +427,7 @@ class EncodeProcessDecodeAlgorithm(HamFinderGNN):
                 logits = self.gnn_model.next_step_logits(batch_graph)
                 probabilites = self.gnn_model.next_step_logits_to_probabilites(batch_graph, logits)
                 self.loss += self.compute_loss(logits, probabilites, step_number, is_algorithm_stopped_mask)
-                return self.teacher_tensor[:, step_number + 1]
+                return self.teacher_tensor[:, step_number]
 
             def update_algorithm_stopped_mask(self, all_previous_choices, current_choice, is_algorithm_stopped_mask):
                 return is_algorithm_stopped_mask
