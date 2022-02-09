@@ -11,8 +11,8 @@ from src.ExactSolvers import ConcordeHamiltonSolver
 
 
 def test_concorde_execution_time():
-    graph_sizes = [int((1.5)**k) for k in range(10, 24)]
-    ham_existance_probabilites = [0.1, 0.3, 0.5, 0.7]
+    graph_sizes = [int((1.5)**k) for k in range(25, 26)]
+    ham_existance_probabilites = [0.7]
     examples_per_size = 5
     timestamp = int(time.time())
 

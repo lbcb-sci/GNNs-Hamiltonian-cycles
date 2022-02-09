@@ -3,7 +3,7 @@ import pandas
 import time
 from pathlib import Path
 
-from src.GraphGenerators import ErdosRenyiGenerator
+from src.data.GraphGenerators import ErdosRenyiGenerator
 
 def test_graph_generator_speed():
     nr_examples_per_size = 10
@@ -27,4 +27,3 @@ if __name__ == "__main__":
     df = test_graph_generator_speed()
     df.to_csv("tests/graph_generation_time.csv")
     print(df.groupby("graph_size").agg("mean"))
-        

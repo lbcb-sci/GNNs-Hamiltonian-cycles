@@ -1,9 +1,8 @@
 import itertools
 import os.path
 from abc import ABC, abstractmethod
-from typing import List
+from typing import List, Callable
 import numpy
-import copy
 
 import torch
 import torch.nn.functional as F
@@ -29,8 +28,9 @@ class WalkUpdater:
         return d
 
     @staticmethod
-    def update_state(d: torch_g.data.Data, current_nodes):
-        previous = torch.squeeze(torch.nonzero(torch.eq(d.x[..., 1], torch.ones_like(d.x[..., 1]))), -1)
+    def update_batch_states(d: torch_g.data.Data, current_nodes):
+        previous = torch.eq(d.x[..., 1], 1)
+        # previous = torch.squeeze(torch.nonzero(torch.eq(d.x[..., 1], torch.ones_like(d.x[..., 1]))), -1)
 
         if torch.any(current_nodes < 0).item() or torch.any(current_nodes > d.num_nodes).item():
             raise Exception("Illegal choice of next step node when updating graph mask!")
@@ -82,16 +82,18 @@ class HamFinderGNN(HamiltonSolver, torch_lightning.LightningModule):
         logits = self.next_step_logits(d)
         return self._mask_neighbor_logits(logits, d)
 
+    def next_step_logits_to_probabilites(self, graph_batch: torch_g.data.Batch, logits):
+        return torch_scatter.scatter_softmax(logits, graph_batch.batch)
+
     def next_step_prob_masked_over_neighbors(self, d: torch_g.data.Batch) -> torch.Tensor:
         logits = self.next_step_logits_masked_over_neighbors(d)
-        neighbor_prob = torch_scatter.scatter_softmax(logits, d.batch)
-        return neighbor_prob
+        return self.next_step_logits_to_probabilites(d, logits)
 
     def prepare_for_first_step(self, d: torch_g.data.Batch, start_batch):
         return self.graph_updater.batch_prepare_for_first_step(d, start_batch)
 
     def update_state(self, d: torch_g.data.Data, current_batch):
-        return self.graph_updater.update_state(d, current_batch)
+        return self.graph_updater.update_batch_states(d, current_batch)
 
     @abstractmethod
     def init_graph(self, d) -> None:
@@ -126,7 +128,70 @@ class HamFinderGNN(HamiltonSolver, torch_lightning.LightningModule):
 
         return p, choice
 
-    def batch_run_greedy_neighbor(self, batch_data: torch_g.data.Batch):
+    class _RunInstructions:
+        def on_algorithm_start_fn(self, batch_graph):
+            start_index = 0
+            return start_index
+
+        def choose_next_step_fn(self, batch_graph, current_nodes, step_number, is_algorithm_stopped_mask):
+            pass
+
+        def update_algorithm_stopped_mask(self, all_previous_choices, current_choice, is_algorithm_stopped_mask):
+            if len(all_previous_choices) > 0:
+                already_visited_mask = torch.any(
+                    torch.stack([torch.eq(x, current_choice) for x in all_previous_choices], -1), -1)
+                is_algorithm_stopped_mask = torch.maximum(is_algorithm_stopped_mask, already_visited_mask)
+            return is_algorithm_stopped_mask
+
+    def batch_run_greedy_neighbor(self, batch_graph: torch_g.data.Batch):
+        class GreedyRunInstructions(self._RunInstructions):
+            def __init__(self, gnn_model) -> None:
+                self.gnn_model = gnn_model
+
+            def on_algorithm_start_fn(self, batch_graph):
+                self.gnn_model.init_graph(batch_graph)
+                start_index = 0
+                return start_index
+
+            def choose_next_step_fn(self, batch_graph, current_nodes, step_number, is_algorithm_stopped_mask):
+                _, next_step_choices = self.gnn_model._neighbor_prob_and_greedy_choice_for_batch(batch_graph)
+                return next_step_choices
+
+        walks = self._run_on_graph_batch(batch_graph, GreedyRunInstructions(self))
+        return walks
+
+    def _run_on_graph_batch(self, batch_graph: torch_g.data.Batch, run_instructions: _RunInstructions):
+        nodes_per_graph = [d.num_nodes for d in batch_graph.to_data_list()]
+        max_steps_in_a_cycle = max(nodes_per_graph) + 1
+        all_choices = []
+        next_step_choices = None
+        current_nodes = None
+        is_algorithm_stopped_mask = torch.zeros(
+            [batch_graph.num_graphs], device=batch_graph.edge_index.device, dtype=torch.uint8)
+
+        start_step_number = run_instructions.on_algorithm_start_fn(batch_graph)
+
+        for step_number in range(start_step_number, max_steps_in_a_cycle - 1):
+            if step_number in [0, 1]:
+                self.prepare_for_first_step(batch_graph, current_nodes)
+            else:
+                self.update_state(batch_graph, current_nodes[current_nodes != -1])
+
+            next_step_choices = run_instructions.choose_next_step_fn(batch_graph, current_nodes, step_number, is_algorithm_stopped_mask)
+            next_step_choices = torch.logical_not(is_algorithm_stopped_mask) * next_step_choices - is_algorithm_stopped_mask
+            current_nodes = next_step_choices
+
+            is_algorithm_stopped_mask = run_instructions.update_algorithm_stopped_mask(all_choices, current_nodes, is_algorithm_stopped_mask)
+            all_choices.append(next_step_choices)
+
+            if torch.all(is_algorithm_stopped_mask).item():
+                break
+        walks = torch.stack(all_choices, -1)
+        if walks.shape[-1] != max_steps_in_a_cycle:
+            walks = F.pad(walks, (0, max_steps_in_a_cycle - walks.shape[-1]), value=-1)
+        return walks
+
+    def batch_run_greedy_neighbor_old(self, batch_data: torch_g.data.Batch):
         with torch.no_grad():
             nodes_per_graph = [d.num_nodes for d in batch_data.to_data_list()]
             max_steps_in_a_cycle = max(nodes_per_graph) + 1
@@ -195,7 +260,7 @@ class HamFinderGNN(HamiltonSolver, torch_lightning.LightningModule):
             subgraph_sizes = [g.num_nodes for g in batch_graph.to_data_list()]
 
         batch_shift = numpy.cumsum([0] + [subgraph_size for subgraph_size in subgraph_sizes[:-1]])
-        walks_tensor, _ = self.batch_run_greedy_neighbor(batch_graph)
+        walks_tensor = self.batch_run_greedy_neighbor(batch_graph)
         return self._conver_batch_walk_tensor_into_solution_list(walks_tensor, batch_shift)
 
     def solve_graphs(self, graphs):
@@ -312,6 +377,66 @@ class EncodeProcessDecodeAlgorithm(HamFinderGNN):
         return self.next_step_logits_masked_over_neighbors(d)
 
     def training_step(self, graph_batch_dict):
+        batch_graph, teacher_paths = self._unpack_graph_batch_dict(graph_batch_dict)
+
+        class TrainingRunInstructions(self._RunInstructions):
+            def __init__(self, gnn_model, graph_batch_dict) -> None:
+                self.gnn_model = gnn_model
+                self.batch_graph, teacher_paths = self.gnn_model._unpack_graph_batch_dict(graph_batch_dict)
+                self.loss = torch.zeros(1, device=self.batch_graph.edge_index.device)
+                _batch_graph_one_hot = F.one_hot(self.batch_graph.batch, self.batch_graph.num_graphs)
+                graph_sizes = torch.sum(_batch_graph_one_hot, dim=0)
+                graph_shifts = graph_sizes.cumsum(0).roll(1)
+                graph_shifts[0] = 0
+                self.teacher_tensor = torch.stack(teacher_paths, 0)
+
+                if self.gnn_model.loss_type == "mse":
+                    mse_weights = F.normalize(_batch_graph_one_hot, 1, -1).sum(-1)
+                    def _compute_loss(logits, probabilities, step_number, is_algorithm_stopped_mask):
+                        mse_loss = torch.nn.MSELoss(reduction="none")
+                        teacher_p = torch.zeroslike(probabilities)
+                        teacher_p[self.teacher_tensor[:, step_number + 1]] = 1
+                        return (mse_loss(probabilities, teacher_p) * mse_weights).sum()
+                elif self.gnn_model.loss_type == "entropy":
+                    def _compute_loss(logits, probabilites, step_number, is_algorithm_stopped_mask):
+                        entropy_loss = torch.nn.CrossEntropyLoss()
+                        subgraph_losses = []
+                        for subgraph_index in range(len(graph_shifts)):
+                            graph_start_index = graph_shifts[subgraph_index]
+                            graph_end_index = graph_shifts[subgraph_index+1] if subgraph_index + 1 < len(graph_shifts) else self.batch_graph.num_nodes
+                            _graph_logits = logits[graph_start_index: graph_end_index].unsqueeze(0)
+                            subgraph_losses.append(
+                                entropy_loss(_graph_logits, self.teacher_tensor[subgraph_index: subgraph_index + 1, step_number] - graph_start_index))
+                        return torch.stack(subgraph_losses).sum()
+                self.compute_loss = _compute_loss
+
+            def on_algorithm_start_fn(self, batch_graph):
+                self.gnn_model.init_graph(batch_graph)
+                self.gnn_model.prepare_for_first_step(batch_graph, None)
+                _ = self.gnn_model.next_step_logits(batch_graph)
+                self.gnn_model.graph_updater.batch_prepare_for_first_step(batch_graph, self.teacher_tensor[:, 0])
+
+                start_index = 1
+                return start_index
+
+
+            def choose_next_step_fn(self, batch_graph, current_nodes, step_number, is_algorithm_stopped_mask):
+                logits = self.gnn_model.next_step_logits(batch_graph)
+                probabilites = self.gnn_model.next_step_logits_to_probabilites(batch_graph, logits)
+                self.loss += self.compute_loss(logits, probabilites, step_number, is_algorithm_stopped_mask)
+                return self.teacher_tensor[:, step_number + 1]
+
+            def update_algorithm_stopped_mask(self, all_previous_choices, current_choice, is_algorithm_stopped_mask):
+                return is_algorithm_stopped_mask
+
+        run_instructions = TrainingRunInstructions(self, graph_batch_dict)
+        self._run_on_graph_batch(batch_graph, run_instructions)
+
+        avg_loss = run_instructions.loss / run_instructions.teacher_tensor.nelement()
+        self.log("train/loss", avg_loss)
+        return avg_loss
+
+    def training_step_old(self, graph_batch_dict):
         batch_graph, teacher_paths = self._unpack_graph_batch_dict(graph_batch_dict)
 
         self.init_graph(batch_graph)
