@@ -46,6 +46,9 @@ class HamFinderGNN(HamiltonSolver, torch_lightning.LightningModule):
         self.graph_updater = graph_updater
         self.BATCH_SIZE_DURING_INFERENCE = 8
 
+        self.log_train_tag = "train"
+        self.log_val_tag = "val"
+        self.log_test_tag = "test"
         self.validation_accuracy_metrics, self.test_accuracy_metrics = \
             [torch.nn.ModuleDict({
                 name: torchmetrics.Accuracy(compute_on_step=False)
@@ -286,6 +289,22 @@ class HamFinderGNN(HamiltonSolver, torch_lightning.LightningModule):
                 prediction = torch.tensor(df_scores[column_name], dtype=torch.float)
                 metric.update(prediction, torch.ones_like(prediction, dtype=torch.int))
 
+    def on_test_epoch_start(self, *args, **kwargs) -> None:
+        return super().on_test_epoch_start()
+
+    def test_step(self, graph_batch_dict, batch_idx, dataloader_idx=None):
+        batch_graph, _ = self._unpack_graph_batch_dict(graph_batch_dict)
+        walks = self.solve_batch_graph(batch_graph)
+        graph_list = batch_graph.to_data_list()
+        self.update_accuracy_metrics(self.test_accuracy_metrics, graph_list, walks)
+
+    def on_test_epoch_end(self, *args, **kwargs) -> None:
+        for metric_name, metric in self.test_accuracy_metrics.items():
+            self.log(f"{self.log_test_tag}/{metric_name}", metric.compute())
+            metric.reset()
+        return super().on_test_epoch_end()
+
+
 
 class HamCycleFinderWithValueFunction(HamFinderGNN):
     @abstractmethod
@@ -498,23 +517,6 @@ class EncodeProcessDecodeAlgorithm(HamFinderGNN):
             self.log(f"validation/{metric_name}", metric.compute())
             metric.reset()
         return super().on_validation_epoch_end()
-
-    def predict_step(self, graph_batch_dict, batch_idx):
-        batch_graph, _ = self._unpack_graph_batch_dict(graph_batch_dict)
-        walk_tensors = self.solve_batch_graph(batch_graph)
-        return walk_tensors
-
-    def test_step(self, graph_batch_dict, batch_idx, dataloader_idx=None):
-        batch_graph, _ = self._unpack_graph_batch_dict(graph_batch_dict)
-        walks = self.predict_step(graph_batch_dict, batch_idx)
-        graph_list = batch_graph.to_data_list()
-        self.update_accuracy_metrics(self.test_accuracy_metrics, graph_list, walks)
-
-    def on_test_epoch_end(self) -> None:
-        for metric_name, metric in self.test_accuracy_metrics.items():
-            self.log(f"test/{metric_name}", metric.compute())
-            metric.reset()
-        return super().on_test_epoch_end()
 
     def configure_optimizers(self):
         return torch.optim.Adam(self.parameters(), 1e-4)
@@ -757,7 +759,6 @@ class GatedGCNEmbedAndProcess(EmbeddingAndMaxMPNN):
     def init_graph(self, d) -> None:
         d.edge_attr = torch.ones([d.edge_index.shape[1], self.hidden_dim]) # TODO this is duplicated from superclass (also, would be nice to only do it once and pass embeding through dataloaders)
         self.embed(d)
-
 
 
     # def __init__(self, nr_epochs, iterations_in_epoch, episodes_per_example=1, scorer=CombinatorialScorer(1, -1, 2, 1),
