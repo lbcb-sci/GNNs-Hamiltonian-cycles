@@ -10,7 +10,7 @@ LEGACY_WEIGHTS_STORAGE_DIR = "legacy_model_weights"
 
 LEGACY_HAMS_CLASS = EncodeProcessDecodeAlgorithm
 LEGACY_HAMS_CLASS_NAME = EncodeProcessDecodeAlgorithm.__name__
-LEGACY_HAMS_CONSTRUCTOR_PARAMETERS = {"processor_depth": 5, "in_dim": 1, "out_dim": 1, "hidden_dim": 32, "graph_updater": WalkUpdater(), "loss_type": "mse"}
+LEGACY_HAMS_CONSTRUCTOR_PARAMETERS = {"processor_depth": 5, "in_dim": 1, "out_dim": 1, "hidden_dim": 32, "graph_updater_class": WalkUpdater, "loss_type": "mse"}
 LEGACY_HAMS_PROCESSOR_FILENAME = f"{LEGACY_HAMS_CLASS_NAME}_Processor.tar"
 LEGACY_HAMS_ENCODER_FILENAME = f"{LEGACY_HAMS_CLASS_NAME}_Encoder.tar"
 LEGACY_HAMS_DECODER_FILENAME = f"{LEGACY_HAMS_CLASS_NAME}_Decoder.tar"
@@ -23,7 +23,7 @@ LEGACY_HAMR_PROCESSOR_FILENAME = f"{LEGACY_HAMR_CLASS_NAME}-Processor.tar"
 
 LEGACY_HAMR_CONSTRUCTOR_PARAMETERS = {
     "in_dim": 3, "out_dim": 2, "hidden_dim": 32, "embedding_depth": 8, "processor_depth": 5, "value_function_weight": 1,
-    "l2_regularization_weight": 0.01, "loss_type": "mse", "graph_updater": WalkUpdater(), "solution_scorer": CombinatorialScorer()}
+    "l2_regularization_weight": 0.01, "loss_type": "mse", "graph_updater_class": WalkUpdater, "solution_scorer": CombinatorialScorer()}
 LEGACY_HAMR_EMBEDDING_DEPTH = 8
 LEGACY_HAMR_PROCESSOR_DEPTH = 5
 LEGACY_HAMR_HIDDEN_DIM = 32
@@ -88,16 +88,20 @@ def load_legacy_HamR(directory=LEGACY_WEIGHTS_STORAGE_DIR):
 def store_legacy_model(model, directory):
     directory = Path(directory)
     if isinstance(model, LEGACY_HAMS_CLASS):
-        paramteter_paths = _get_HamS_weights_path(directory)
-        encoder_path, decoder_path, processor_path, initial_hidden_path = [paramteter_paths[tag] for tag in ["encoder_path", "decoder_path", "processor_path", "initial_hidden_path"]]
+        parameter_paths = _get_HamS_weights_path(directory)
+        encoder_path, decoder_path, processor_path, initial_hidden_path = [parameter_paths[tag] for tag in ["encoder_path", "decoder_path", "processor_path", "initial_hidden_path"]]
         model = model
-        for module, path in zip(
+        for submodule_name, submodule, path in zip(
+                ["processor", "encoder", "decoder"],
                 [model.processor_nn, model.encoder_nn, model.decoder_nn],
                 [processor_path, encoder_path, decoder_path]):
-            torch.save(module.state_dict(), path)
+            torch.save(submodule.state_dict(), path)
+            print(f"Saved {submodule_name} weights to {path}")
         torch.save(model.initial_h, initial_hidden_path)
+        print(f"Saved initial hidden tensor to {initial_hidden_path}")
     elif isinstance(model, LEGACY_HAMR_CLASS):
-        embedding_path, processor_path = model.get_weights_paths(directory)
+        parameter_paths = _get_HamR_weights_path(directory)
+        embedding_path, processor_path = [parameter_paths[tag] for tag in ["embedding_path", "processor_path"]]
         embedding_save_data = {
             'initial': {"initial": model.initial_embedding},
             'MPNN': model.embedding.state_dict(),
@@ -107,9 +111,10 @@ def store_legacy_model(model, directory):
             'MPNN': model.processor.state_dict(),
             'out_projection': model.processor_out_projection.state_dict()
         }
-        for save_data, path in zip([embedding_save_data, processor_save_data],
+        for submodule_name, save_data, path in zip(["embedding", "processor"], [embedding_save_data, processor_save_data],
                                    [embedding_path, processor_path]):
             torch.save(save_data, path)
+            print(f"Save {submodule_name} submodule weights to {path}")
 
 
 def load_legacy_models(directory=LEGACY_WEIGHTS_STORAGE_DIR):

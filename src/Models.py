@@ -1,7 +1,6 @@
 import itertools
 import os.path
 from abc import ABC, abstractmethod
-from typing import List, Callable
 import numpy
 
 import torch
@@ -15,7 +14,6 @@ import torchmetrics
 from src.HamiltonSolver import HamiltonSolver
 from src.NN_modules import ResidualMultilayerMPNN, MultilayerGatedGCN
 from src.data.GraphDataset import BatchedSimulationStates, SimulationState
-from src.constants import MODEL_WEIGHTS_FOLDER
 import src.Evaluation as Evaluation
 import src.solution_scorers as scorers
 
@@ -30,20 +28,17 @@ class WalkUpdater:
     @staticmethod
     def update_batch_states(d: torch_g.data.Data, current_nodes):
         previous = torch.eq(d.x[..., 1], 1)
-        # previous = torch.squeeze(torch.nonzero(torch.eq(d.x[..., 1], torch.ones_like(d.x[..., 1]))), -1)
-
         if torch.any(current_nodes < 0).item() or torch.any(current_nodes > d.num_nodes).item():
             raise Exception("Illegal choice of next step node when updating graph mask!")
-
         d.x[previous, 1] = 0
         d.x[current_nodes, 1] = 1
         d.x[current_nodes, 2] = 1
 
 
 class HamFinderGNN(HamiltonSolver, torch_lightning.LightningModule):
-    def __init__(self, graph_updater: WalkUpdater):
+    def __init__(self, graph_updater_class: WalkUpdater):
         super(HamFinderGNN, self).__init__()
-        self.graph_updater = graph_updater
+        self.graph_updater = graph_updater_class()
         self.BATCH_SIZE_DURING_INFERENCE = 8
 
         self.log_train_tag = "train"
@@ -54,15 +49,6 @@ class HamFinderGNN(HamiltonSolver, torch_lightning.LightningModule):
                 name: torchmetrics.Accuracy(compute_on_step=False)
                 for name in ("hamiltonian_cycle", "hamiltonian_path", "90_perc_cycle", "90_perc_path")}
                                  ) for _ in range(2)]
-
-    @abstractmethod
-    def next_step_logits(self, d: torch_g.data.Batch) -> torch.Tensor:
-        pass
-
-    def next_step_prob(self, d: torch_g.data.Batch) -> torch.Tensor:
-        logits = self.next_step_logits(d)
-        p = torch_scatter.scatter_softmax(logits, d.batch)
-        return p
 
     @staticmethod
     def _neighbor_indices(d: torch_g.data.Data):
@@ -79,18 +65,18 @@ class HamFinderGNN(HamiltonSolver, torch_lightning.LightningModule):
         neighbor_logits[valid_next_step_indices] = logits.index_select(0, valid_next_step_indices)
         return neighbor_logits
 
+    @abstractmethod
+    def raw_next_step_logits(self, d: torch_g.data.Batch) -> torch.Tensor:
+        pass
+
     def next_step_logits_masked_over_neighbors(self, d: torch_g.data.Batch) -> torch.Tensor:
         if torch.all(torch.lt(d.x[..., 1], 0.5)):
             return self.next_step_logits(d)
         logits = self.next_step_logits(d)
         return self._mask_neighbor_logits(logits, d)
 
-    def next_step_logits_to_probabilites(self, graph_batch: torch_g.data.Batch, logits):
+    def scattered_logits_to_probabilities(self, graph_batch: torch_g.data.Batch, logits=None):
         return torch_scatter.scatter_softmax(logits, graph_batch.batch)
-
-    def next_step_prob_masked_over_neighbors(self, d: torch_g.data.Batch) -> torch.Tensor:
-        logits = self.next_step_logits_masked_over_neighbors(d)
-        return self.next_step_logits_to_probabilites(d, logits)
 
     def prepare_for_first_step(self, d: torch_g.data.Batch, start_batch):
         return self.graph_updater.batch_prepare_for_first_step(d, start_batch)
@@ -103,19 +89,7 @@ class HamFinderGNN(HamiltonSolver, torch_lightning.LightningModule):
         pass
 
     @abstractmethod
-    def parameters(self):
-        pass
-
-    @abstractmethod
     def description(self) -> str:
-        pass
-
-    @abstractmethod
-    def load_weights(self, out_folder):
-        pass
-
-    @abstractmethod
-    def save_weights(self, out_folder):
         pass
 
     def _neighbor_prob_and_greedy_choice_for_batch(self, d: torch_g.data.Batch):
@@ -145,23 +119,6 @@ class HamFinderGNN(HamiltonSolver, torch_lightning.LightningModule):
                     torch.stack([torch.eq(x, current_choice) for x in all_previous_choices], -1), -1)
                 is_algorithm_stopped_mask = torch.maximum(is_algorithm_stopped_mask, already_visited_mask)
             return is_algorithm_stopped_mask
-
-    def batch_run_greedy_neighbor(self, batch_graph: torch_g.data.Batch):
-        class GreedyRunInstructions(self._RunInstructions):
-            def __init__(self, gnn_model) -> None:
-                self.gnn_model = gnn_model
-
-            def on_algorithm_start_fn(self, batch_graph):
-                self.gnn_model.init_graph(batch_graph)
-                start_index = 0
-                return start_index
-
-            def choose_next_step_fn(self, batch_graph, current_nodes, step_number, is_algorithm_stopped_mask):
-                _, next_step_choices = self.gnn_model._neighbor_prob_and_greedy_choice_for_batch(batch_graph)
-                return next_step_choices
-
-        walks = self._run_on_graph_batch(batch_graph, GreedyRunInstructions(self))
-        return walks
 
     def _run_on_graph_batch(self, batch_graph: torch_g.data.Batch, run_instructions: _RunInstructions):
         nodes_per_graph = [d.num_nodes for d in batch_graph.to_data_list()]
@@ -194,48 +151,25 @@ class HamFinderGNN(HamiltonSolver, torch_lightning.LightningModule):
             walks = F.pad(walks, (0, max_steps_in_a_cycle - walks.shape[-1]), value=-1)
         return walks
 
-    def batch_run_greedy_neighbor_old(self, batch_data: torch_g.data.Batch):
-        with torch.no_grad():
-            nodes_per_graph = [d.num_nodes for d in batch_data.to_data_list()]
-            max_steps_in_a_cycle = max(nodes_per_graph) + 1
+    def batch_run_greedy_neighbor(self, batch_graph: torch_g.data.Batch):
+        class GreedyRunInstructions(self._RunInstructions):
+            def __init__(self, gnn_model) -> None:
+                self.gnn_model = gnn_model
 
-            self.init_graph(batch_data)
-            all_choices, all_scores = [], []
-            choice = None
-            stop_algorithm_mask = torch.zeros(
-                [batch_data.num_graphs], device=batch_data.edge_index.device, dtype=torch.uint8)
+            def on_algorithm_start_fn(self, batch_graph):
+                self.gnn_model.init_graph(batch_graph)
+                start_index = 0
+                return start_index
 
-            for step in range(0, max_steps_in_a_cycle):
-                if step < 2:
-                    self.prepare_for_first_step(batch_data, choice)
-                else:
-                    current_nodes = choice
-                    self.update_state(batch_data, current_nodes[current_nodes != -1])
-                p, choice = self._neighbor_prob_and_greedy_choice_for_batch(batch_data)
-                choice = torch.logical_not(stop_algorithm_mask) * choice - stop_algorithm_mask
-                p = p * torch.logical_not(stop_algorithm_mask)[..., None] - stop_algorithm_mask[..., None]
-                if len(all_choices) > 0:
-                    already_visited_mask = torch.any(
-                        torch.stack([torch.eq(x, choice) for x in all_choices], -1), -1)
-                    stop_algorithm_mask = torch.maximum(stop_algorithm_mask, already_visited_mask)
-                all_choices.append(choice)
-                all_scores.append(p)
+            def choose_next_step_fn(self, batch_graph, current_nodes, step_number, is_algorithm_stopped_mask):
+                _, next_step_choices = self.gnn_model._neighbor_prob_and_greedy_choice_for_batch(batch_graph)
+                return next_step_choices
 
-                if torch.all(stop_algorithm_mask).item():
-                    break
-            walks = torch.stack(all_choices, -1)
-            selections = torch.stack(all_scores, -2)
-            if walks.shape[-1] != max_steps_in_a_cycle:
-                walks = F.pad(walks, (0, max_steps_in_a_cycle - walks.shape[-1]), value=-1)
-            if selections.shape[-2] != max_steps_in_a_cycle:
-                selections = F.pad(selections, (0, 0, 0, max_steps_in_a_cycle - selections.shape[-2]), value=-1)
-            return walks, selections
-
-    def get_batch_size_for_multi_solving(self):
-        return self.BATCH_SIZE_DURING_INFERENCE
+        walks = self._run_on_graph_batch(batch_graph, GreedyRunInstructions(self))
+        return walks
 
     @staticmethod
-    def _conver_batch_walk_tensor_into_solution_list(batch_walks_tensor, graphs_shift_inside_batch):
+    def _convert_batch_walk_tensor_into_solution_list(batch_walks_tensor, graphs_shift_inside_batch):
         batch_walks_tensor -= graphs_shift_inside_batch[:, None]
         batch_walks_tensor[batch_walks_tensor < 0] = -1
         raw_walks = [[int(node.item()) for node in walk] for walk in batch_walks_tensor]
@@ -246,7 +180,7 @@ class HamFinderGNN(HamiltonSolver, torch_lightning.LightningModule):
         return walks
 
     @staticmethod
-    def _unpack_graph_batch_dict(graph_batch_dict) -> tuple[torch_g.data.Batch, List[List[int]]]:
+    def _unpack_graph_batch_dict(graph_batch_dict) -> tuple[torch_g.data.Batch, list[list[int]]]:
         list_of_graph_edge_indexes = graph_batch_dict["list_of_edge_indexes"]
         list_of_graph_num_nodes = graph_batch_dict["list_of_graph_num_nodes"]
         teacher_paths = graph_batch_dict.get("teacher_paths")
@@ -264,7 +198,7 @@ class HamFinderGNN(HamiltonSolver, torch_lightning.LightningModule):
 
         batch_shift = numpy.cumsum([0] + [subgraph_size for subgraph_size in subgraph_sizes[:-1]])
         walks_tensor = self.batch_run_greedy_neighbor(batch_graph)
-        return self._conver_batch_walk_tensor_into_solution_list(walks_tensor, batch_shift)
+        return self._convert_batch_walk_tensor_into_solution_list(walks_tensor, batch_shift)
 
     def solve_graphs(self, graphs):
         graph_iterator = iter(graphs)
@@ -289,9 +223,6 @@ class HamFinderGNN(HamiltonSolver, torch_lightning.LightningModule):
                 prediction = torch.tensor(df_scores[column_name], dtype=torch.float)
                 metric.update(prediction, torch.ones_like(prediction, dtype=torch.int))
 
-    def on_test_epoch_start(self, *args, **kwargs) -> None:
-        return super().on_test_epoch_start()
-
     def test_step(self, graph_batch_dict, batch_idx, dataloader_idx=None):
         batch_graph, _ = self._unpack_graph_batch_dict(graph_batch_dict)
         walks = self.solve_batch_graph(batch_graph)
@@ -305,10 +236,9 @@ class HamFinderGNN(HamiltonSolver, torch_lightning.LightningModule):
         return super().on_test_epoch_end()
 
 
-
 class HamCycleFinderWithValueFunction(HamFinderGNN):
     @abstractmethod
-    def next_step_logits_and_value_function(self, d:torch_g.data.Data) -> [torch.Tensor, torch.Tensor]:
+    def raw_next_step_logits_and_value_function(self, d:torch_g.data.Data) -> tuple[torch.Tensor, torch.Tensor]:
         pass
 
 
@@ -322,15 +252,9 @@ class EncodeProcessDecodeAlgorithm(HamFinderGNN):
         decoder_nn = torch.nn.Sequential(torch.nn.Linear(self.hidden_dim + self.hidden_dim, self.out_dim))
         return encoder_nn, decoder_nn
 
-    def __init__(self, is_load_weights=False, processor_depth=3, in_dim=1, out_dim=1, hidden_dim=32, graph_updater=WalkUpdater(), loss_type="mse"):
-        super().__init__(graph_updater)
-
+    def __init__(self, processor_depth=3, in_dim=1, out_dim=1, hidden_dim=32, graph_updater_class=WalkUpdater, loss_type="mse"):
+        super().__init__(graph_updater_class)
         self.save_hyperparameters()
-
-        self.PROCESSOR_NAME = f"{self.__class__.__name__}_Processor.tar"
-        self.ENCODER_NAME = f"{self.__class__.__name__}_Encoder.tar"
-        self.DECODER_NAME = f"{self.__class__.__name__}_Decoder.tar"
-        self.INITIAL_HIDDEN_TENSOR_NAME = f"{self.__class__.__name__}_InitialHiddenTensor.pt"
 
         self.in_dim = in_dim
         self.out_dim = out_dim
@@ -343,49 +267,17 @@ class EncodeProcessDecodeAlgorithm(HamFinderGNN):
         self.processor_nn = self._construct_processor()
         self.initial_h = torch.nn.Parameter(torch.rand(self.hidden_dim))
 
-        if is_load_weights:
-            self.load_weights()
-
-
-    # def on_load_checkpoint(self, checkpoint) -> None:
-    #     _processor_depth_varname = "processor_depth"
-    #     if _processor_depth_varname in checkpoint:
-    #         self.processor_depth = checkpoint[_processor_depth_varname]
-    #         self._construct_processor()
-
-
     def description(self):
         return f"encoder: {torchinfo.summary(self.encoder_nn, verbose=0, depth=5)}\n" \
                f"processor (hidden dim={self.hidden_dim}):" \
                f" {torchinfo.summary(self.processor_nn, verbose=0, depth=5)}\n" \
                f"decoder: {torchinfo.summary(self.decoder_nn, verbose=0, depth=5)}"
 
-    def get_weights_paths(self, directory):
-        return [os.path.join(directory, name) for name in
-                [self.ENCODER_NAME, self.DECODER_NAME, self.PROCESSOR_NAME, self.INITIAL_HIDDEN_TENSOR_NAME]]
+    # def parameters(self):
+    #     return itertools.chain(self.encoder_nn.parameters(), self.decoder_nn.parameters(),
+    #                            self.processor_nn.parameters(), [self.initial_h])
 
-    def load_weights(self, directory=MODEL_WEIGHTS_FOLDER):
-        encoder_path, decoder_path, processor_path, initial_hidden_path = self.get_weights_paths(directory)
-        for module, path in zip(
-                [self.encoder_nn, self.decoder_nn, self.processor_nn],
-                [encoder_path, decoder_path, processor_path]):
-            if os.path.isfile(path):
-                module.load_state_dict(torch.load(path))
-                print("Loaded {} from {}".format(module.__class__.__name__, path))
-            else:
-                print(f"Failed to load parameters from {path}")
-        if os.path.isfile(initial_hidden_path):
-            self.initial_h = torch.nn.Parameter(torch.load(initial_hidden_path))
-            # self.initial_h = self.initial_h.to(self.device)
-        else:
-            print(f"Faliled to load parameters from {path}")
-            self.initial_h = torch.nn.Parameter(torch.rand(self.hidden_dim, device=self.device))
-
-    def parameters(self):
-        return itertools.chain(self.encoder_nn.parameters(), self.decoder_nn.parameters(),
-                               self.processor_nn.parameters(), [self.initial_h])
-
-    def next_step_logits(self, d: torch_g.data.Data):
+    def raw_next_step_logits(self, d: torch_g.data.Data):
         d.z = self.encoder_nn(torch.cat([d.x, d.h], dim=-1))
         d.h = self.processor_nn(d.z, d.edge_index, d.edge_attr)
         return torch.squeeze(self.decoder_nn(torch.cat([d.z, d.h], dim=-1)), dim=-1)
@@ -402,8 +294,8 @@ class EncodeProcessDecodeAlgorithm(HamFinderGNN):
         batch_graph, teacher_paths = self._unpack_graph_batch_dict(graph_batch_dict)
 
         class TrainingRunInstructions(self._RunInstructions):
-            def __init__(self, gnn_model, graph_batch_dict) -> None:
-                self.gnn_model = gnn_model
+            def __init__(self, gnn_model: HamFinderGNN, graph_batch_dict) -> None:
+                self.gnn_model: HamFinderGNN = gnn_model
                 self.batch_graph, teacher_paths = self.gnn_model._unpack_graph_batch_dict(graph_batch_dict)
                 self.loss = torch.zeros(1, device=self.batch_graph.edge_index.device)
                 _batch_graph_one_hot = F.one_hot(self.batch_graph.batch, self.batch_graph.num_graphs)
@@ -435,21 +327,19 @@ class EncodeProcessDecodeAlgorithm(HamFinderGNN):
             def on_algorithm_start_fn(self, batch_graph):
                 self.gnn_model.init_graph(batch_graph)
                 self.gnn_model.prepare_for_first_step(batch_graph, None)
-                _ = self.gnn_model.next_step_logits(batch_graph)
+                _ = self.gnn_model.raw_next_step_logits(batch_graph)
                 self.gnn_model.graph_updater.batch_prepare_for_first_step(batch_graph, self.teacher_tensor[:, 0])
-
                 start_index = 1
                 return start_index
 
-
             def choose_next_step_fn(self, batch_graph, current_nodes, step_number, is_algorithm_stopped_mask):
-                logits = self.gnn_model.next_step_logits(batch_graph)
-                probabilites = self.gnn_model.next_step_logits_to_probabilites(batch_graph, logits)
+                logits = self.gnn_model.raw_next_step_logits(batch_graph)
+                probabilites = self.gnn_model.scattered_logits_to_probabilities(batch_graph, logits)
                 self.loss += self.compute_loss(logits, probabilites, step_number, is_algorithm_stopped_mask)
                 return self.teacher_tensor[:, step_number]
 
             def update_algorithm_stopped_mask(self, all_previous_choices, current_choice, is_algorithm_stopped_mask):
-                return is_algorithm_stopped_mask
+                return is_algorithm_stopped_mask # No need for update, because of teacher forcing all batch algortithms will run util the end.
 
         run_instructions = TrainingRunInstructions(self, graph_batch_dict)
         self._run_on_graph_batch(batch_graph, run_instructions)
@@ -458,58 +348,11 @@ class EncodeProcessDecodeAlgorithm(HamFinderGNN):
         self.log("train/loss", avg_loss)
         return avg_loss
 
-    def training_step_old(self, graph_batch_dict):
-        batch_graph, teacher_paths = self._unpack_graph_batch_dict(graph_batch_dict)
-
-        self.init_graph(batch_graph)
-        self.prepare_for_first_step(batch_graph, None)
-        self.next_step_logits(batch_graph)
-        self.prepare_for_first_step(batch_graph, [teacher_path[0] for teacher_path in teacher_paths])
-
-        loss = torch.zeros(1, device=batch_graph.edge_index.device)
-        graph_sizes = torch.sum(F.one_hot(batch_graph.batch, batch_graph.num_graphs), dim=0)
-        graph_shifts = graph_sizes.cumsum(0).roll(1)
-        graph_shifts[0] = 0
-        max_steps = torch.max(graph_sizes, dim=-1).values + 1
-        for step in range(1, max_steps):
-            active_graphs_index = [index for index in range(len(teacher_paths)) if len(teacher_paths[index]) > step]
-            active_teacher_paths = [teacher_paths[index] for index in active_graphs_index]
-            current_nodes, next_step_nodes = [torch.stack([teacher_path[node_index] for teacher_path in active_teacher_paths])
-                                              for node_index in (step-1, step)]
-            if step > 1:
-                self.update_state(batch_graph, current_nodes)
-
-            if self.loss_type == "mse":
-                p = self.next_step_prob(batch_graph)
-            elif self.loss_type == "entropy":
-                logits = self.next_step_logits(batch_graph)
-
-            subgraph_losses = []
-            for graph_index in range(len(graph_shifts)):
-                graph_start_index = graph_shifts[graph_index]
-                graph_end_index = graph_shifts[graph_index+1] if graph_index + 1 < len(graph_shifts) else batch_graph.num_nodes
-                if self.loss_type == "mse":
-                    mse_loss = torch.nn.MSELoss()
-                    _graph_p = p[graph_start_index: graph_end_index]
-                    _teacher_p = torch.zeros_like(_graph_p)
-                    _teacher_p[next_step_nodes[graph_index] - graph_start_index] = 1.
-                    loss += mse_loss(_graph_p, _teacher_p)
-                elif self.loss_type == "entropy":
-                    entropy_loss = torch.nn.CrossEntropyLoss()
-                    _graph_logits = logits[graph_start_index: graph_end_index].unsqueeze(0)
-                    subgraph_losses.append(entropy_loss(_graph_logits, next_step_nodes[graph_index:graph_index + 1] - graph_start_index))
-            loss += torch.stack(subgraph_losses).sum()
-        loss = loss / (max_steps * len(graph_sizes))
-        self.log("train/loss", loss)
-        return loss
-
     def validation_step(self, graph_batch_dict, dataloader_idx):
         with torch.no_grad():
-            batch_graph, _ = self._unpack_graph_batch_dict(graph_batch_dict)
             loss = self.training_step(graph_batch_dict)
             self.log("validation/loss", loss)
-            solutions = self.solve_batch_graph(batch_graph)
-            self.update_accuracy_metrics(self.validation_accuracy_metrics, batch_graph.to_data_list(), solutions)
+            self.test_step(graph_batch_dict, None, dataloader_idx)
             return loss
 
     def on_validation_epoch_end(self) -> None:
@@ -520,14 +363,6 @@ class EncodeProcessDecodeAlgorithm(HamFinderGNN):
 
     def configure_optimizers(self):
         return torch.optim.Adam(self.parameters(), 1e-4)
-
-    def save_weights(self, directory=MODEL_WEIGHTS_FOLDER):
-        encoder_path, decoder_path, processor_path, initial_hidden_path = self.get_weights_paths(directory)
-        for module, path in zip(
-                [self.processor_nn, self.encoder_nn, self.decoder_nn],
-                [processor_path, encoder_path, decoder_path]):
-            torch.save(module.state_dict(), path)
-        torch.save(self.initial_h, initial_hidden_path)
 
 
 class EmbeddingAndMaxMPNN(HamCycleFinderWithValueFunction):
@@ -541,18 +376,16 @@ class EmbeddingAndMaxMPNN(HamCycleFinderWithValueFunction):
         processor_out_projection = torch.nn.Linear(self.hidden_dim, self.out_dim)
         return processor, processor_out_projection
 
-    def __init__(self, is_load_weights=True, in_dim=3, out_dim=2, hidden_dim=32, embedding_depth=5, processor_depth=5,
+    def __init__(self, in_dim=3, out_dim=2, hidden_dim=32, embedding_depth=5, processor_depth=5,
                  value_function_weight=1, l2_regularization_weight=0.01,
-                 loss_type="mse", graph_updater=WalkUpdater(), solution_scorer=scorers.CombinatorialScorer()):
-        super().__init__(graph_updater)
+                 loss_type="mse", graph_updater_class=WalkUpdater, solution_scorer=scorers.CombinatorialScorer()):
+        super().__init__(graph_updater_class)
         self.save_hyperparameters()
 
         self.scorer = solution_scorer
         self.l2_regularization_weight = l2_regularization_weight
         self.value_function_weight = value_function_weight
-
-        self.EMBEDDING_NAME = "{}-Embedding.tar".format(self.__class__.__name__)
-        self.PROCESSOR_NAME = "{}-Processor.tar".format(self.__class__.__name__)
+        self.loss_type = loss_type
 
         self.in_dim = in_dim
         self.out_dim = out_dim
@@ -565,21 +398,6 @@ class EmbeddingAndMaxMPNN(HamCycleFinderWithValueFunction):
         self.embedding, self.embedding_out_projection = self._construct_embedding()
         self.processor, self.processor_out_projection = self._construct_processor()
 
-        if is_load_weights:
-            self.load_weights()
-
-    # def to(self, device):
-    #     for module in [self.embedding, self.embedding_out_projection, self.processor, self.processor_out_projection]:
-    #         module.to(device)
-    #     self.initial_embedding = self.initial_embedding.to(device)
-    #     self.device = device
-
-    # def to_cuda(self):
-    #     self.initial_embedding.to("cuda")
-    #     for module in [self.embedding, self.embedding_out_projection, self.processor, self.processor_out_projection]:
-    #         module.cuda()
-    #     self.device = "cuda"
-
     def embed(self, d: torch_g.data.Data()):
         d.emb = self.embedding_out_projection(
             self.embedding.forward(torch.unsqueeze(self.initial_embedding, 0).expand(d.num_nodes, -1),
@@ -589,10 +407,10 @@ class EmbeddingAndMaxMPNN(HamCycleFinderWithValueFunction):
         return self.processor_out_projection(
             torch.cat([d.emb, d.x], dim=1) + self.processor(torch.cat([d.emb, d.x], dim=1), d.edge_index, d.edge_attr))
 
-    def next_step_logits(self, d: torch_g.data.Data) -> torch.Tensor:
+    def raw_next_step_logits(self, d: torch_g.data.Data) -> torch.Tensor:
         return self.forward(d)[..., 0]
 
-    def next_step_logits_and_value_function(self, d: torch_g.data.Data) -> [torch.Tensor, torch.Tensor]:
+    def raw_next_step_logits_and_value_function(self, d: torch_g.data.Data) -> tuple[torch.Tensor, torch.Tensor]:
         result = self.forward(d)
         logits = result[..., 0]
         value_estimate = torch.max(result[..., 1], -1)[0]
@@ -618,7 +436,6 @@ class EmbeddingAndMaxMPNN(HamCycleFinderWithValueFunction):
             loss += self._compute_loss(s, a , r)
         self.log("train/avg_reward", torch.stack(rewards).mean())
         return loss
-
 
     def _batch_simulate(self, batched_graph: torch_g.data.Data, max_simulation_depth=-1):
         # TODO tmp compilation code
@@ -654,7 +471,7 @@ class EmbeddingAndMaxMPNN(HamCycleFinderWithValueFunction):
             return states, actions, rewards
 
     def _compute_loss(self, state, action, reward):
-        logits, value_estimate = self.next_step_logits_and_value_function(state)
+        logits, value_estimate = self.raw_next_step_logits_and_value_function(state)
         q = torch.distributions.Categorical(logits=logits)
         l2_params = torch.sum(torch.stack([torch.sum(torch.square(p)) for p in self.parameters()]))
         value_estimate_loss = torch.square(reward - value_estimate)
@@ -686,54 +503,14 @@ class EmbeddingAndMaxMPNN(HamCycleFinderWithValueFunction):
     def configure_optimizers(self):
         return torch.optim.Adam(self.parameters(), 1e-5)
 
-
-    # def get_device(self) -> str:
-    #     return self.device
-
-    def parameters(self):
-        return itertools.chain([self.initial_embedding], self.embedding.parameters(),
-                               self.embedding_out_projection.parameters(), self.processor.parameters(),
-                               self.processor_out_projection.parameters())
+    # def parameters(self):
+    #     return itertools.chain([self.initial_embedding], self.embedding.parameters(),
+    #                            self.embedding_out_projection.parameters(), self.processor.parameters(),
+    #                            self.processor_out_projection.parameters())
 
     def description(self):
         return f"embedding (hidden dim={self.hidden_dim}): {torchinfo.summary(self.embedding, verbose=0, depth=5)}\n" \
                f"processor (hidden dim={self.hidden_dim}): {torchinfo.summary(self.processor, verbose=0, depth=5)}"
-
-    def get_weights_paths(self, directory):
-        return [os.path.join(directory, name) for name in [self.EMBEDDING_NAME, self.PROCESSOR_NAME]]
-
-    def load_weights(self, directory=MODEL_WEIGHTS_FOLDER):
-        embedding_path, processor_path = self.get_weights_paths(directory)
-        if os.path.isfile(embedding_path):
-            embedding_save_data = torch.load(embedding_path)
-            self.initial_embedding = torch.nn.Parameter(embedding_save_data["initial"]["initial"])
-            for module_key, module in zip(["MPNN", "out_projection"], [self.embedding, self.embedding_out_projection]):
-                module.load_state_dict(embedding_save_data[module_key])
-            print("Loaded embedding module from {}".format(embedding_path))
-        else:
-            print(f"Failed to load embedding from {embedding_path}")
-        if os.path.isfile(processor_path):
-            processor_save_data = torch.load(processor_path)
-            for modul_key, module in zip(["MPNN", "out_projection"], [self.processor, self.processor_out_projection]):
-                module.load_state_dict(processor_save_data[modul_key])
-            print("Loaded processor module from {}".format(processor_path))
-        else:
-            print(f"Failed to load processor from {processor_path}")
-
-    def save_weights(self, directory=MODEL_WEIGHTS_FOLDER):
-        embedding_path, processor_path = self.get_weights_paths(directory)
-        embedding_save_data = {
-            'initial': {"initial": self.initial_embedding},
-            'MPNN': self.embedding.state_dict(),
-            'out_projection': self.embedding_out_projection.state_dict()
-        }
-        processor_save_data = {
-            'MPNN': self.processor.state_dict(),
-            'out_projection': self.processor_out_projection.state_dict()
-        }
-        for save_data, path in zip([embedding_save_data, processor_save_data],
-                                   [embedding_path, processor_path]):
-            torch.save(save_data, path)
 
 
 class GatedGCNEmbedAndProcess(EmbeddingAndMaxMPNN):
@@ -759,11 +536,3 @@ class GatedGCNEmbedAndProcess(EmbeddingAndMaxMPNN):
     def init_graph(self, d) -> None:
         d.edge_attr = torch.ones([d.edge_index.shape[1], self.hidden_dim]) # TODO this is duplicated from superclass (also, would be nice to only do it once and pass embeding through dataloaders)
         self.embed(d)
-
-
-    # def __init__(self, nr_epochs, iterations_in_epoch, episodes_per_example=1, scorer=CombinatorialScorer(1, -1, 2, 1),
-    #              l2_regularization_weight=0.01, value_function_weight=1,
-    #              simulation_batch_size=8, verbose=1, max_simulation_steps=None):
-    # HamR_trainer = REINFORCE_WithLearnableBaseline(nr_epochs=train_epochs, iterations_in_epoch=100,
-    #                                                episodes_per_example=1, simulation_batch_size=1)
-    #     return super().configure_optimizers()

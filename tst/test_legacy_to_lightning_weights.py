@@ -32,7 +32,7 @@ if __name__ == "__main__":
     trainer.save_checkpoint(new_weights_directory / "lightning_HamR.ckpt")
     lightning_HamR = Models.GatedGCNEmbedAndProcess.load_from_checkpoint(new_weights_directory / "lightning_HamR.ckpt")
 
-    print("Checking that new models have the same parameters")
+    print("Checking that new models have the same parameters...")
     for old_parameter, new_parameter in tqdm(zip(HamS.parameters(), lightning_HamS.parameters())):
         check = torch.isclose(old_parameter, new_parameter).all().item()
         assert check is True

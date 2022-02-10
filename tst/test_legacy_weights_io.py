@@ -18,3 +18,4 @@ if __name__ == "__main__":
         assert model.hparams == reconstructed_model.hparams
         for parameter, reconstructed_parameter in zip(model.parameters(), reconstructed_model.parameters()):
             assert torch.isclose(parameter, reconstructed_parameter).all().item()
+    print("Loaded and re-stored HamS and HamR models. Old and new weights match")
