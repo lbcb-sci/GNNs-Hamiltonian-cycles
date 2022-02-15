@@ -21,7 +21,7 @@ class TestWithLocalDatasetDataModule(BaseGraphGeneratingDataModule):
     def __init__(self, test_data_directories=None, test_batch_size=1, *args, **kwargs):
         super().__init__(*args, **kwargs)
         if test_data_directories is None:
-            self.test_data_directories = constants.EVALUATION_DATA_FOLDERS
+            self.test_data_directories = constants.EVALUATION_MINIMAL_TEST_DATA_FOLDERS
         else:
             self.test_data_directories = test_data_directories
         self.test_batch_size = test_batch_size

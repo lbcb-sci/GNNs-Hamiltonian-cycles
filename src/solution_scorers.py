@@ -3,7 +3,7 @@ import torch.nn.functional as F
 import torch_geometric as torch_g
 from abc import ABC
 
-import src.Models as Models
+from src.HamiltonSolver import DataUtils
 
 class ReinforcementScorer(ABC):
     def batch_reward(self, d: torch_g.data.Batch, choices, simulation_running_flag=None) -> torch.Tensor:
@@ -18,14 +18,21 @@ class CombinatorialScorer(ReinforcementScorer):
         self.complete_tour_multiplier = complete_tour_multiplier
 
     def batch_reward(self, d: torch_g.data.Batch, choices, simulation_running_flag): # TODO zero step reward seems to be off
+        num_nodes_per_graph = d.num_nodes // d.num_graphs
         valid_next_node_reward = self.valid_next_node_reward
-        illegal_next_node_reward = self.illegal_next_node_multiplier * d.num_nodes
-        complete_cycle_reward = self.complete_cycle_multiplier * d.num_nodes
-        complete_tour_reward = self.complete_tour_multiplier * d.num_nodes
+        illegal_next_node_reward = self.illegal_next_node_multiplier * num_nodes_per_graph
+        complete_cycle_reward = self.complete_cycle_multiplier * num_nodes_per_graph
+        complete_tour_reward = self.complete_tour_multiplier * num_nodes_per_graph
 
-        neighbor_indices = Models.HamFinderGNN._neighbor_indices(d)
-        valid_next_step_mask = torch.isin(choices, neighbor_indices)
-        cycle_mask = torch.equal(d.x[choices, 0], torch.ones_like(d.x[choices, 0]))
+        start_indices = DataUtils._starting_indices(d)
+        neighbor_indices = DataUtils._neighbor_indices(d)
+        if  len(start_indices) == 0:
+            valid_next_step_mask = torch.ones_like(choices, dtype=torch.bool)
+        elif len(start_indices) == d.num_graphs:
+            valid_next_step_mask = torch.isin(choices, neighbor_indices)
+        else:
+            raise RuntimeError("Not implemented: Don't know how to reward batch where some the initial step needs to be selected on some but not all graphs.")
+        cycle_mask = torch.eq(d.x[choices, 0], torch.ones_like(d.x[choices, 0]))
         _expanded_batch_vector = F.one_hot(d.batch)
         full_path_mask = torch.all((_expanded_batch_vector * d.x[..., 2][..., None]) == _expanded_batch_vector, dim=0)
         stop_mask = d.x[choices, 2]
@@ -35,20 +42,8 @@ class CombinatorialScorer(ReinforcementScorer):
                  + torch.logical_not(valid_next_step_mask) * illegal_next_node_reward
         return simulation_running_flag * reward
 
-        # TODO if statement unnecesarry
-        if simulation_running_flag is None:
-            simulation_running_flag = torch.ones_like(choices)
-        x = d.x.reshape([d.num_graphs, -1, 3])
-
-        choices_mask = torch.zeros_like(d.x[..., 2]).scatter_(0, choices, 1).reshape([d.num_graphs, -1])
-        valid_next_steps_mask = Models.HamFinderGNN._neighbor_indices(d).reshape([d.num_graphs, -1])
-        illegal_next_step_mask = torch.logical_not(torch.minimum(valid_next_steps_mask, choices_mask).any())
-
-        cycle_mask = torch.minimum(x[..., 0], choices_mask).any(dim=-1)
-        full_path_mask = x[..., 2].all(-1)
-        stop_mask = torch.minimum(x[..., 2], choices_mask).any(-1)
-        reward = full_path_mask * complete_tour_reward + full_path_mask * cycle_mask * complete_cycle_reward \
-                 + torch.logical_not(stop_mask) * valid_next_node_reward
-        reward = torch.logical_not(illegal_next_step_mask) * reward \
-                 + illegal_next_step_mask * illegal_next_node_reward
-        return simulation_running_flag * reward
+class SizeIndependentCombinatorialScorer(CombinatorialScorer):
+    def batch_reward(self, d: torch_g.data.Batch, choices, simulation_running_flag):
+        reward = super().batch_reward(d, choices, simulation_running_flag)
+        num_nodes_per_graph = d.num_nodes // d.num_graphs
+        return reward / num_nodes_per_graph

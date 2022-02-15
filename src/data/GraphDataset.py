@@ -3,6 +3,7 @@ import torch
 import torch.nn.functional as F
 import torch_geometric as torch_geometric
 from typing import List
+import random
 
 
 class GraphExample:
@@ -16,6 +17,24 @@ class GraphBatchExample:
         self.graph_batch = graph_batch
         self.teacher_paths = teacher_paths
         self.teacher_distributions = teacher_distributions
+
+    @staticmethod
+    def from_graph_examples_list(graph_examples):
+        graphs = [example.graph for example in graph_examples]
+        return GraphBatchExample(
+            torch_geometric.data.Batch.from_data_list(graphs),
+            [example.teacher_path for example in graph_examples],
+            [example.teacher_distribution for example in graph_examples])
+
+    def to_lightning_dict(self):
+        # TODO see if pytorch_lighting can be adjusted to move custom classes from and to devices.
+        # It handles dictionaries of tensors without problems
+        graphs = self.graph_batch.to_data_list()
+        return {
+            "list_of_edge_indexes": [graph.edge_index for graph in graphs],
+            "list_of_graph_num_nodes": [graph.num_nodes for graph in graphs],
+            "teacher_paths": self.teacher_paths,
+        }
 
 class SimulationState:
     def __init__(self, graph_state: torch_geometric.data.Data, action: int, reward: int, simulation_depth: int) -> None:
@@ -83,20 +102,8 @@ class GraphGeneratingDataset(torch.utils.data.Dataset):
 class GraphDataLoader(torch.utils.data.DataLoader):
     @staticmethod
     def graph_collate_fn(graph_examples: List[GraphExample]) -> dict:
-        graphs = [example.graph for example in graph_examples]
-        teacher_paths = [example.teacher_path for example in graph_examples]
-        graph_sizes = [graph.num_nodes for graph in graphs]
-        batch_shift = 0
-        for index_of_walk, walk in enumerate(teacher_paths):
-            walk += batch_shift
-            batch_shift += graph_sizes[index_of_walk]
-        # TODO see if pytorch_lighting can be adjusted to move custom classes from and to devices.
-        # It handles dictionaries of tensors without problems
-        return {
-            "list_of_edge_indexes": [graph.edge_index for graph in graphs],
-            "list_of_graph_num_nodes": [graph.num_nodes for graph in graphs],
-            "teacher_paths": teacher_paths,
-        }
+        graph_batch_example = GraphBatchExample.from_graph_examples_list(graph_examples)
+        return graph_batch_example.to_lightning_dict()
 
     def __init__(self, dataset: GraphGeneratingDataset, *args, **kwargs) -> None:
         super().__init__(dataset, collate_fn=self.graph_collate_fn, *args, **kwargs)
@@ -113,9 +120,9 @@ class SimulationsDataset(torch.utils.data.DataLoader):
         self.simulations_count = 0
         self.simulations_storage = deque()
         self._create_module_copy_for_simulation()
-        self._cupdate_weights_of_simulation_model()
+        self._update_weights_of_simulation_model()
 
-    def _cupdate_weights_of_simulation_model(self):
+    def _update_weights_of_simulation_model(self):
         for original_param, for_simulation_param in zip(self.original_module.parameters(), self._module_for_simulations.parameters()):
             for_simulation_param.data.copy_(original_param).detach_()
 
@@ -131,9 +138,10 @@ class SimulationsDataset(torch.utils.data.DataLoader):
 
         if self.simulations_count >= self.update_simulation_module_after_n_steps:
             self.simulations_count = 0
-            self._cupdate_weights_of_simulation_model()
+            self._update_weights_of_simulation_model()
 
         simulation_data = self._module_for_simulations._run_episode(next(iter(self.graph_generator)))
+        random.shuffle(simulation_data)
         self.simulations_storage.extend(simulation_data)
         self.simulations_count += 1
         return self.simulations_storage.pop()
