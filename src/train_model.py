@@ -10,12 +10,11 @@ import src.Models as Models
 def train_model(model_class, datamodule_class, model_checkpoint=None, model_hyperparams={}, datamodule_hyperparams={},
                 trainer_hyperparams={}, train_parameters={},
                 checkpoint_saving_dir=constants.MODEL_CHECKPOINT_SAVING_DIRECTORY, wandb_directory=constants.WANDB_DIRECTORY,
-                is_log_offline=True, wandb_project=constants.WEIGHTS_AND_BIASES_PROJECT, run_name=None, is_log_model=False):
+                is_log_offline=False, wandb_project=constants.WEIGHTS_AND_BIASES_PROJECT, run_name=None, is_log_model=True):
     if run_name is None:
         datetime_now = datetime.datetime.now()
         run_name = f"{model_class}_{datetime_now.strftime('%Y%m%d%h')[2:]}"
     wandb_logger = lightning_loggers.WandbLogger(name=run_name, project=wandb_project, offline=is_log_offline, log_model=is_log_model)
-    # wandb_logger.__init__()
     wandb_logger.experiment.log({"is_started_from_checkpoint": model_checkpoint is not None,
                                  "checkpoint": model_checkpoint})
 
@@ -45,28 +44,10 @@ def train_model(model_class, datamodule_class, model_checkpoint=None, model_hype
 
     wandb_logger.finalize()
 
-def test_model():
-    dataloader = datamodule.test_dataloader()
-    if isinstance(dataloader.dataset, ErdosRenyiInMemoryDataset):
-        sizes = set(graph_item.graph.num_nodes for graph_item in dataloader.dataset)
-        test_dataloaders = []
-        for size in sizes:
-            subset_dataloader = copy.deepcopy(dataloader)
-            subset_dataloader.dataset.data_list = \
-                [data_item for data_item in subset_dataloader.dataset.data_list if data_item[ErdosRenyiInMemoryDataset.NUM_NODES_TAG] == size]
-            test_dataloaders.append(subset_dataloader)
-    else:
-        test_dataloaders = [dataloader]
-
-    best_model_path = checkpoint_callback.best_model_path
-    print(best_model_path)
-    model = Models.EncodeProcessDecodeAlgorithm.load_from_checkpoint(best_model_path)
-
-    trainer.test(model, dataloaders=test_dataloaders[1])
 
 if __name__== "__main__":
     model_class = Models.GatedGCNEmbedAndProcess
-    model_hyperparams = {"processor_depth": 5}
+    model_hyperparams = {"processor_depth": 3}
 
     datamodule_class = DataModules.ReinforcementErdosRenyiDataModule
     datamodule_hyperparams = {}
