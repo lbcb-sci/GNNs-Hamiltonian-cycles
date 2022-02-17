@@ -220,6 +220,11 @@ class HamFinderGNN(HamiltonSolver, torch_lightning.LightningModule):
                 prediction = torch.tensor(df_scores[column_name], dtype=torch.float)
                 metric.update(prediction, torch.ones_like(prediction, dtype=torch.int))
 
+    def log_validation_accuracy_metrics(self):
+        for metric_name, metric in self.validation_accuracy_metrics.items():
+            self.log(f"validation/{metric_name}", metric.compute())
+            metric.reset()
+
     def _test_and_update_accuracy_metrics(self, graph_batch_dict, accuracy_metrics):
         batch_graph, _ = self._unpack_graph_batch_dict(graph_batch_dict)
         walks = self.solve_batch_graph(batch_graph)
@@ -350,10 +355,7 @@ class EncodeProcessDecodeAlgorithm(HamFinderGNN):
             return loss
 
     def on_validation_epoch_end(self) -> None:
-        for metric_name, metric in self.validation_accuracy_metrics.items():
-            self.log(f"validation/{metric_name}", metric.compute())
-            metric.reset()
-        return super().on_validation_epoch_end()
+        self.log_validation_accuracy_metrics()
 
     def configure_optimizers(self):
         return torch.optim.Adam(self.parameters(), 1e-4)
@@ -429,9 +431,13 @@ class EmbeddingAndMaxMPNN(HamCycleFinderWithValueFunction):
         for (s, a, r) in zip(states, actions, rewards):
             self.init_graph(s) # TODO would be nice pass this through dataloaders and have it executed only on first step
             batch_losses.append(self._compute_loss(s, a , r))
-        self.log("train/avg_reward", torch.stack(rewards).mean())
-        self.log("train/avg_simulation_depth", torch.stack(simulation_depth).type(torch.float32).mean())
-        return torch.stack(batch_losses).mean()
+        loss = torch.stack(batch_losses).mean()
+        self.log_dict({
+            "train/loss": loss,
+            "train/avg_reward": torch.stack(rewards).mean(),
+            "train/avg_simulation_depth": torch.stack(simulation_depth).type(torch.float32).mean()
+            })
+        return loss
 
     def on_validation_start(self) -> None:
         self._validation_nr_different_graphs_seen = 0
@@ -447,8 +453,10 @@ class EmbeddingAndMaxMPNN(HamCycleFinderWithValueFunction):
                 self._validation_nr_different_graphs_seen += len(graphs)
                 batch_example = GraphBatchExample.from_graph_examples_list([GraphExample(graph, None) for graph in graphs])
                 self._test_and_update_accuracy_metrics(batch_example.to_lightning_dict(), self.validation_accuracy_metrics)
-
         return loss
+
+    def on_validation_epoch_end(self) -> None:
+        self.log_validation_accuracy_metrics()
 
     def create_simulation_batch(self, d):
         return torch_g.data.Batch.from_data_list([d.detach().clone() for _ in range(self.nr_simultaneous_simulations)])
