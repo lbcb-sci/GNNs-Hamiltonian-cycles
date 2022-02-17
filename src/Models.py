@@ -124,7 +124,7 @@ class HamFinderGNN(HamiltonSolver, torch_lightning.LightningModule):
         next_step_choices = None
         current_nodes = None
         is_algorithm_stopped_mask = torch.zeros(
-            [batch_graph.num_graphs], device=batch_graph.edge_index.device, dtype=torch.uint8)
+            [batch_graph.num_graphs], device=batch_graph.edge_index.device, dtype=torch.bool)
 
         start_step_number = run_instructions.on_algorithm_start_fn(batch_graph)
 
@@ -135,7 +135,7 @@ class HamFinderGNN(HamiltonSolver, torch_lightning.LightningModule):
                 self.update_state(batch_graph, current_nodes[current_nodes != -1])
 
             next_step_choices = run_instructions.choose_next_step_fn(batch_graph, current_nodes, step_number, is_algorithm_stopped_mask)
-            next_step_choices = torch.logical_not(is_algorithm_stopped_mask) * next_step_choices - is_algorithm_stopped_mask
+            next_step_choices = torch.logical_not(is_algorithm_stopped_mask) * next_step_choices - is_algorithm_stopped_mask * torch.ones_like(next_step_choices)
             current_nodes = next_step_choices
 
             is_algorithm_stopped_mask = run_instructions.update_algorithm_stopped_mask(all_choices, current_nodes, is_algorithm_stopped_mask)
