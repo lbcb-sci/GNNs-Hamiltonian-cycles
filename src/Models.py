@@ -46,10 +46,12 @@ class WalkUpdater:
 
 
 class HamFinderGNN(HamiltonSolver, torch_lightning.LightningModule):
-    def __init__(self, graph_updater_class: WalkUpdater):
+    def __init__(self, graph_updater_class: WalkUpdater, learning_rate=1e-4,
+                 inference_batch_size=8):
         super(HamFinderGNN, self).__init__()
         self.graph_updater = graph_updater_class()
-        self.BATCH_SIZE_DURING_INFERENCE = 8
+        self.learning_rate = learning_rate
+        self._inference_batch_size = inference_batch_size
 
         self.log_train_tag = "train"
         self.log_val_tag = "val"
@@ -241,6 +243,9 @@ class HamFinderGNN(HamiltonSolver, torch_lightning.LightningModule):
             metric.reset()
         return super().on_test_epoch_end()
 
+    def configure_optimizers(self):
+        return torch.optim.Adam(self.parameters(), self.learning_rate)
+
 
 class HamCycleFinderWithValueFunction(HamFinderGNN):
     @abstractmethod
@@ -258,7 +263,8 @@ class EncodeProcessDecodeAlgorithm(HamFinderGNN):
         decoder_nn = torch.nn.Sequential(torch.nn.Linear(self.hidden_dim + self.hidden_dim, self.out_dim))
         return encoder_nn, decoder_nn
 
-    def __init__(self, processor_depth=3, in_dim=1, out_dim=1, hidden_dim=32, graph_updater_class=WalkUpdater, loss_type="mse"):
+    def __init__(self, processor_depth=3, in_dim=1, out_dim=1, hidden_dim=32, graph_updater_class=WalkUpdater,
+                 loss_type="mse"):
         super().__init__(graph_updater_class)
         self.save_hyperparameters()
 
@@ -356,9 +362,6 @@ class EncodeProcessDecodeAlgorithm(HamFinderGNN):
 
     def on_validation_epoch_end(self) -> None:
         self.log_validation_accuracy_metrics()
-
-    def configure_optimizers(self):
-        return torch.optim.Adam(self.parameters(), 1e-4)
 
 
 class EmbeddingAndMaxMPNN(HamCycleFinderWithValueFunction):
@@ -537,9 +540,6 @@ class EmbeddingAndMaxMPNN(HamCycleFinderWithValueFunction):
             if action is not None
         ]
         return simulation_data
-
-    def configure_optimizers(self):
-        return torch.optim.Adam(self.parameters(), 1e-5)
 
     def description(self):
         return f"embedding (hidden dim={self.hidden_dim}): {torchinfo.summary(self.embedding, verbose=0, depth=5)}\n" \
