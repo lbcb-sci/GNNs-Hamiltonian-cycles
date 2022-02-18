@@ -10,14 +10,15 @@ LIGHTNING_MODULE_REFERENCE = "lightning_module_reference"
 
 
 class BaseGraphGeneratingDataModule(torch_lightning.LightningDataModule):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, train_graph_size=25, train_batch_size=8, train_virtual_epoch=2000, val_graph_size=None, val_batch_size=None,
+                 val_virtual_epoch_size=None, *args, **kwargs):
         self.__lightnig_module_reference =  kwargs.pop(LIGHTNING_MODULE_REFERENCE)
-        self.train_graph_size = kwargs.pop("train_graph_size", 25)
-        self.train_batch_size = kwargs.pop("train_batch_size", 8)
-        self.train_virtual_epoch_size = kwargs.pop("train_virtual_epoch_size", 2000)
-        self.val_graph_size = kwargs.pop("val_graph_size", 25)
-        self.val_batch_size = kwargs.pop("val_batch_size", 8)
-        self.val_virtual_epoch_size = kwargs.pop("val_virtual_epoch_size", 100)
+        self.train_graph_size = train_graph_size
+        self.train_batch_size = train_batch_size
+        self.train_virtual_epoch_size = train_virtual_epoch
+        self.val_graph_size = val_graph_size if val_graph_size else self.train_graph_size
+        self.val_batch_size = val_batch_size if val_batch_size else self.train_batch_size
+        self.val_virtual_epoch_size = val_virtual_epoch_size if val_virtual_epoch_size else self.train_virtual_epoch_size
 
         super().__init__(*args, **kwargs)
 
@@ -39,9 +40,9 @@ class TestWithLocalDatasetDataModule(BaseGraphGeneratingDataModule):
 
 
 class ArtificialCycleDataModule(TestWithLocalDatasetDataModule):
-    def __init__(self, *args, **kwargs):
-        self.train_noise_prob_per_edge = kwargs.pop("train_noise_prob_per_edge", 0.1)
-        self.val_noise_prob_per_edge = kwargs.pop("val_noise_prob_per_edge", self.train_noise_prob_per_edge)
+    def __init__(self, train_noise_prob_per_edge=0.1, val_noise_prob_per_edge=None, *args, **kwargs):
+        self.train_noise_prob_per_edge = train_noise_prob_per_edge
+        self.val_noise_prob_per_edge = val_noise_prob_per_edge if val_noise_prob_per_edge else self.train_noise_prob_per_edge
         super().__init__(*args, **kwargs)
 
     def prepare_data(self) -> None:
@@ -59,13 +60,14 @@ class ArtificialCycleDataModule(TestWithLocalDatasetDataModule):
         return GraphDataLoader(GraphGeneratingDataset(generator, self.val_virtual_epoch_size), batch_size=self.val_batch_size)
 
 class ReinforcementErdosRenyiDataModule(TestWithLocalDatasetDataModule):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, train_ham_existence_prob=0.8, val_ham_existence_prob=None, train_nr_simultaneous_simulations=4,
+                 val_nr_simultaneous_simulations=1, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.simulation_module = self.__lightnig_module_reference
-        self.train_ham_existence_prob = kwargs.pop("train_ham_existence_prob", 0.8)
-        self.val_ham_existence_prob = kwargs.pop("val_ham_existence_prob", 0.8)
-        self.train_nr_simultaneous_simulations = kwargs.pop("train_nr_simultaneous_simulations", 4)
-        self.val_nr_simultaneous_simulations = kwargs.pop("val_nr_simultaneous_simulations", 1)
+        self.train_ham_existence_prob = train_ham_existence_prob
+        self.val_ham_existence_prob = val_ham_existence_prob if val_ham_existence_prob else self.train_ham_existence_prob
+        self.train_nr_simultaneous_simulations = train_nr_simultaneous_simulations
+        self.val_nr_simultaneous_simulations = val_nr_simultaneous_simulations
 
     def prepare_data(self) -> None:
         return super().prepare_data()
