@@ -42,7 +42,7 @@ def train_model(model_class, datamodule_class, model_checkpoint=None, model_hype
 
     trainer.test(datamodule=datamodule)
 
-    wandb_logger.finalize()
+    wandb_logger.finalize("Success")
 
 if __name__== "__main__":
     model_class = Models.GatedGCNEmbedAndProcess
