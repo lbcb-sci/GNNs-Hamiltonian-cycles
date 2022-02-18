@@ -14,17 +14,9 @@ import torchmetrics
 
 from src.HamiltonSolver import DataUtils, HamiltonSolver
 from src.NN_modules import ResidualMultilayerMPNN, MultilayerGatedGCN
-from src.data.GraphDataset import BatchedSimulationStates, GraphBatchExample, GraphExample, SimulationState
+from src.data.GraphDataset import BatchedSimulationStates, GraphBatchExample, GraphExample, SimulationState, get_shifts_for_graphs_in_batch
 import src.Evaluation as Evaluation
 import src.solution_scorers as scorers
-
-
-def get_shifts_for_graphs_in_batch(batch_graph: torch_g.data.Batch):
-    batch_graph_one_hot = F.one_hot(batch_graph.batch, batch_graph.num_graphs)
-    graph_sizes = torch.sum(batch_graph_one_hot, dim=0)
-    graph_shifts = graph_sizes.cumsum(0).roll(1)
-    graph_shifts[0] = 0
-    return graph_shifts
 
 
 class WalkUpdater:

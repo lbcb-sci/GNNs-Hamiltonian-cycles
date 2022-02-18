@@ -6,6 +6,14 @@ from typing import List
 import random
 
 
+def get_shifts_for_graphs_in_batch(batch_graph: torch_geometric.data.Batch):
+    batch_graph_one_hot = F.one_hot(batch_graph.batch, batch_graph.num_graphs)
+    graph_sizes = torch.sum(batch_graph_one_hot, dim=0)
+    graph_shifts = graph_sizes.cumsum(0).roll(1)
+    graph_shifts[0] = 0
+    return graph_shifts
+
+
 class GraphExample:
     def __init__(self, graph:torch_geometric.data.Data, teacher_path: torch.Tensor, teacher_distribution: torch.Tensor=None) -> None:
         self.graph = graph
@@ -21,9 +29,11 @@ class GraphBatchExample:
     @staticmethod
     def from_graph_examples_list(graph_examples):
         graphs = [example.graph for example in graph_examples]
+        batch_graph = torch_geometric.data.Batch.from_data_list(graphs)
+        graph_shifts = get_shifts_for_graphs_in_batch(batch_graph)
         return GraphBatchExample(
-            torch_geometric.data.Batch.from_data_list(graphs),
-            [example.teacher_path for example in graph_examples],
+            batch_graph,
+            [example.teacher_path + shift for example, shift in zip(graph_examples, graph_shifts)],
             [example.teacher_distribution for example in graph_examples])
 
     def to_lightning_dict(self):
