@@ -25,7 +25,7 @@ def train_model(model_class, datamodule_class, model_checkpoint=None, model_hype
     wandb_logger.experiment.summary["description"] = model.description()
 
     datamodule_hyperparams.update({
-        DataModules.SIMULATION_MODULE_VARIABLE_NAME: model,
+        DataModules.LIGHTNING_MODULE_REFERENCE: model,
     })
     datamodule = datamodule_class(**datamodule_hyperparams)
 
