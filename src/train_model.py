@@ -1,7 +1,7 @@
-from asyncio.log import logger
 import pytorch_lightning as torch_lightning
 import pytorch_lightning.loggers as lightning_loggers
 import datetime
+import itertools
 
 import src.data.DataModules as DataModules
 import src.constants as constants
@@ -14,9 +14,13 @@ def train_model(model_class, datamodule_class, model_checkpoint=None, model_hype
     if run_name is None:
         datetime_now = datetime.datetime.now()
         run_name = f"{model_class.__name__.split('.')[-1][:10]}_{datetime_now.strftime('%Y%m%d%H%M')[2:]}"
+
+
     wandb_logger = lightning_loggers.WandbLogger(name=run_name, project=wandb_project, offline=is_log_offline, log_model=is_log_model)
-    wandb_logger.experiment.summary["is_started_from_checkpoint"] = model_checkpoint is not None
-    wandb_logger.experiment.summary["checkpoint"] = str(model_checkpoint)
+    wandb_logger.experiment.config["is_started_from_checkpoint"] = model_checkpoint is not None
+    wandb_logger.experiment.config["checkpoint"] = str(model_checkpoint)
+    for key, value in itertools.chain(datamodule_hyperparams.items(), trainer_hyperparams.items()):
+        wandb_logger.experiment.config[key] = value
 
     if model_checkpoint is None:
         model = model_class(**model_hyperparams)
@@ -43,6 +47,7 @@ def train_model(model_class, datamodule_class, model_checkpoint=None, model_hype
     trainer.test(datamodule=datamodule)
 
     wandb_logger.finalize("Success")
+
 
 if __name__== "__main__":
     model_class = Models.GatedGCNEmbedAndProcess
