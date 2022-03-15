@@ -10,12 +10,12 @@ LIGHTNING_MODULE_REFERENCE = "lightning_module_reference"
 
 
 class BaseGraphGeneratingDataModule(torch_lightning.LightningDataModule):
-    def __init__(self, train_graph_size=25, train_batch_size=8, train_virtual_epoch=2000, val_graph_size=None, val_batch_size=None,
+    def __init__(self, train_graph_size=25, train_batch_size=8, train_virtual_epoch_size=2000, val_graph_size=None, val_batch_size=None,
                  val_virtual_epoch_size=None, *args, **kwargs):
         self.__lightnig_module_reference =  kwargs.pop(LIGHTNING_MODULE_REFERENCE)
         self.train_graph_size = train_graph_size
         self.train_batch_size = train_batch_size
-        self.train_virtual_epoch_size = train_virtual_epoch
+        self.train_virtual_epoch_size = train_virtual_epoch_size
         self.val_graph_size = val_graph_size if val_graph_size else self.train_graph_size
         self.val_batch_size = val_batch_size if val_batch_size else self.train_batch_size
         self.val_virtual_epoch_size = val_virtual_epoch_size if val_virtual_epoch_size else self.train_virtual_epoch_size
