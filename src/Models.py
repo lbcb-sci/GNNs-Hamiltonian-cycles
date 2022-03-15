@@ -191,6 +191,9 @@ class HamFinderGNN(HamiltonSolver, torch_lightning.LightningModule):
         walks_tensor = self.batch_run_greedy_neighbor(batch_graph)
         return self._convert_batch_walk_tensor_into_solution_list(walks_tensor, batch_shift)
 
+    def get_batch_size_for_multi_solving(self):
+        return 1
+
     def solve_graphs(self, graphs):
         graph_iterator = iter(graphs)
         batch_size = self.get_batch_size_for_multi_solving()

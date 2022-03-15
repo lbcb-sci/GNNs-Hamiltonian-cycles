@@ -2,7 +2,7 @@ from collections import deque
 import torch
 import torch.nn.functional as F
 import torch_geometric as torch_geometric
-from typing import List
+from typing import Iterable, List
 import random
 
 
@@ -115,7 +115,7 @@ class GraphDataLoader(torch.utils.data.DataLoader):
         graph_batch_example = GraphBatchExample.from_graph_examples_list(graph_examples)
         return graph_batch_example.to_lightning_dict()
 
-    def __init__(self, dataset: GraphGeneratingDataset, *args, **kwargs) -> None:
+    def __init__(self, dataset: Iterable[GraphExample], *args, **kwargs) -> None:
         super().__init__(dataset, collate_fn=self.graph_collate_fn, *args, **kwargs)
 
 
