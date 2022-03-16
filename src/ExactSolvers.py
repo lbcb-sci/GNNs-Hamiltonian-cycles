@@ -4,6 +4,7 @@ import shutil
 import subprocess
 import textwrap
 from typing import List
+import copy
 
 import torch
 import torch_geometric as torch_g
@@ -89,8 +90,33 @@ class ConcordeHamiltonSolver(HamiltonSolver):
 
         return tour, real_time, user_time
 
-    def solve(self, d: torch_g.data.Data, input_file=None):
-        return self.time_execution(d, input_file)[0]
+    @staticmethod
+    def _transform_path_problem_graph_to_cycles_problem_path(d: torch_g.data.Data):
+        transformed_d = copy.deepcopy(d)
+        artifiical_node = d.num_nodes
+        transformed_d.num_nodes += 1
+
+        all_nodes = torch.arange(0, d.num_nodes, dtype=d.edge_index.dtype, device=d.edge_index.device)
+        new_edges = torch.stack([all_nodes, torch.full_like(all_nodes, artifiical_node)])
+        transformed_d.edge_index = torch.concat([transformed_d.edge_index, new_edges, new_edges.flip(0)], dim=-1)
+
+        return transformed_d, artifiical_node
+
+
+    def solve(self, d: torch_g.data.Data):
+        hamiltonian_cycle, _, _ = self.time_execution(d)
+        if len(hamiltonian_cycle) > 0:
+            return hamiltonian_cycle
+
+        ham_path_d, artificial_node = self._transform_path_problem_graph_to_cycles_problem_path(d)
+        artificial_cycle, _, _ = self.time_execution(ham_path_d)
+        if len(artificial_cycle) > 0:
+            artificial_cycle = artificial_cycle[:-1]
+            artificial_node_index = artificial_cycle.index(artificial_node)
+            hamiltonian_path = artificial_cycle[artificial_node_index + 1:] + artificial_cycle[:artificial_node_index]
+            return hamiltonian_path
+
+        return []
 
     def solve_graphs(self, graphs: List[torch_g.data.Data]):
         return [self.solve(graph) for graph in graphs]
