@@ -88,7 +88,7 @@ class EvaluationScores:
                 size_counter[graph.num_nodes] += 1
             else:
                 size_counter[graph.num_nodes] = 1
-            if size_counter[graph.num_nodes] > num_per_size:
+            if num_per_size is not None and size_counter[graph.num_nodes] > num_per_size:
                 continue
             else:
                 yield (graph, ham_cycle)
@@ -100,9 +100,7 @@ class EvaluationScores:
 
         def _get_generator():
             graph_example_gen = InMemoryDataset.ErdosRenyiInMemoryDataset(data_folders)
-            if nr_graphs_per_size is not None:
-                gen = EvaluationScores._filtered_generator(nr_graphs_per_size, graph_example_gen)
-            return gen
+            return EvaluationScores._filtered_generator(nr_graphs_per_size, graph_example_gen)
 
         is_hamiltonian = numpy.array([x[1] is not None and len(x[1]) > 0 for x in _get_generator()])
 
