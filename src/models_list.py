@@ -13,7 +13,7 @@ train_request_HamS_model = model_utils.ModelTrainRequest(
         "loss_type": "entropy",
     },
     trainer_hyperparams = {
-        "max_epochs": 2,
+        "max_epochs": 200,
         "num_sanity_val_steps": 2,
         "log_every_n_steps": 5,
         "check_val_every_n_epoch": 5,

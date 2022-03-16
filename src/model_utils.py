@@ -1,6 +1,6 @@
 import datetime
-from gc import callbacks
 import itertools
+from inspect import isclass
 
 import torch
 import pytorch_lightning as torch_lightning
@@ -79,7 +79,7 @@ def train_model(model_class, datamodule_class, model_checkpoint=None, model_hype
 
 def create_model_for_wandb_run(wandb_run, checkpoint_path):
     checkpoint = wandb_run.config["checkpoint"]
-    model_classes = [var for var_name, var in vars(models) if isinstance(var, models.HamFinderGNN)]
+    model_classes = [var for var_name, var in vars(models).items() if isclass(var) and issubclass(var, models.HamFinderGNN)]
     model = None
     for c in model_classes:
         try:
@@ -90,7 +90,7 @@ def create_model_for_wandb_run(wandb_run, checkpoint_path):
 
 
 def test_on_saved_data(model: HamiltonSolver, wandb_run=None):
-    df_testing_results = EvaluationScores.accuracy_scores_on_saved_data([model], ["model"])
+    df_testing_results = EvaluationScores.accuracy_scores_on_saved_data([model], ["model"], nr_graphs_per_size=None)
 
     unified_test_tag = "unified_test"
 

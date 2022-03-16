@@ -15,7 +15,7 @@ if __name__ == "__main__":
     wandb_project = constants.WEIGHTS_AND_BIASES_PROJECT
     wandb_kwargs = {"project": wandb_project, "resume": True}
     wandb_run = wandb.init(project=wandb_project, id=wandb_id, resume=True)
-    model = model_utils.create_model_for_wandb_run(wandb_run, wandb_run["checkpoint"])
+    model = model_utils.create_model_for_wandb_run(wandb_run, wandb_run.config["checkpoint"])
 
     results = model_utils.test_on_saved_data(model, wandb_run=wandb_run)
     wandb_run.finish()
