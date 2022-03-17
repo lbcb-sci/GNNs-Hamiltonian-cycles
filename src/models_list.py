@@ -24,7 +24,7 @@ train_request_HamS_model = model_utils.ModelTrainRequest(
         "train_batch_size": 32,
         "val_batch_size": 32,
         "train_graph_size": 25,
-        "train_noise_prob_per_edge": 1/25,
+        "train_expected_noise_edges_per_node": 3,
     },
     model_checkpoint_hyperparams = {
         "every_n_epochs": 1,

@@ -40,9 +40,9 @@ class TestWithLocalDatasetDataModule(BaseGraphGeneratingDataModule):
 
 
 class ArtificialCycleDataModule(TestWithLocalDatasetDataModule):
-    def __init__(self, train_noise_prob_per_edge=0.1, val_noise_prob_per_edge=None, *args, **kwargs):
-        self.train_noise_prob_per_edge = train_noise_prob_per_edge
-        self.val_noise_prob_per_edge = val_noise_prob_per_edge if val_noise_prob_per_edge else self.train_noise_prob_per_edge
+    def __init__(self, train_expected_noise_edges_per_node, val_expected_noise_edges_per_node=None, *args, **kwargs):
+        self.train_expected_noise_edges_per_node = train_expected_noise_edges_per_node
+        self.val_expected_noise_edges_per_node = val_expected_noise_edges_per_node if val_expected_noise_edges_per_node else self.train_expected_noise_edges_per_node
         super().__init__(*args, **kwargs)
 
     def prepare_data(self) -> None:
@@ -52,11 +52,11 @@ class ArtificialCycleDataModule(TestWithLocalDatasetDataModule):
         return super().setup(stage)
 
     def train_dataloader(self):
-        generator = NoisyCycleGenerator(self.train_graph_size, self.train_noise_prob_per_edge)
+        generator = NoisyCycleGenerator(self.train_graph_size, self.train_expected_noise_edges_per_node)
         return GraphDataLoader(GraphGeneratingDataset(generator, self.train_virtual_epoch_size), batch_size=self.train_batch_size)
 
     def val_dataloader(self):
-        generator = NoisyCycleGenerator(self.val_graph_size, self.val_noise_prob_per_edge)
+        generator = NoisyCycleGenerator(self.val_graph_size, self.val_expected_noise_edges_per_node)
         return GraphDataLoader(GraphGeneratingDataset(generator, self.val_virtual_epoch_size), batch_size=self.val_batch_size)
 
 class ReinforcementErdosRenyiDataModule(TestWithLocalDatasetDataModule):
