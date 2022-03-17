@@ -2,8 +2,8 @@ import pytorch_lightning as torch_lightning
 
 import src.constants as constants
 from src.data.InMemoryDataset import ErdosRenyiInMemoryDataset
-from src.data.GraphDataset import GraphGeneratingDataset, GraphDataLoader, SimulationStatesDataLoader, SimulationsDataset
-from src.data.GraphGenerators import ErdosRenyiGenerator, NoisyCycleGenerator
+from src.data.GraphDataset import GraphAndSolutionGeneratingDataset, GraphGeneratingDataset, GraphDataLoader, SimulationStatesDataLoader, SimulationsDataset
+from src.data.GraphGenerators import ErdosRenyiExamplesGenerator, ErdosRenyiGenerator, NoisyCycleGenerator
 
 
 LIGHTNING_MODULE_REFERENCE = "lightning_module_reference"
@@ -58,6 +58,28 @@ class ArtificialCycleDataModule(TestWithLocalDatasetDataModule):
     def val_dataloader(self):
         generator = NoisyCycleGenerator(self.val_graph_size, self.val_expected_noise_edges_per_node)
         return GraphDataLoader(GraphGeneratingDataset(generator, self.val_virtual_epoch_size), batch_size=self.val_batch_size)
+
+
+class SolvedErdosRenyiDataModule(TestWithLocalDatasetDataModule):
+    def __init__(self, train_hamilton_existence_probability, val_hamilton_existence_probability=None, *args, **kwargs):
+        self.train_hamilton_existence_probability = train_hamilton_existence_probability
+        self.val_hamilton_existence_probability = val_hamilton_existence_probability if val_hamilton_existence_probability else train_hamilton_existence_probability
+        super().__init__(*args, **kwargs)
+
+    def prepare_data(self) -> None:
+        return super().prepare_data()
+
+    def setup(self, stage=None) -> None:
+        return super().setup(stage)
+
+    def train_dataloader(self):
+        generator = ErdosRenyiExamplesGenerator(self.train_graph_size, self.train_hamilton_existence_probability)
+        return GraphDataLoader(GraphAndSolutionGeneratingDataset(generator, self.train_virtual_epoch_size), batch_size=self.train_batch_size)
+
+    def val_dataloader(self):
+        generator = ErdosRenyiExamplesGenerator(self.val_graph_size, self.val_hamilton_existence_probability)
+        return GraphDataLoader(GraphAndSolutionGeneratingDataset(generator, self.val_virtual_epoch_size), batch_size=self.val_batch_size)
+
 
 class ReinforcementErdosRenyiDataModule(TestWithLocalDatasetDataModule):
     def __init__(self, train_ham_existence_prob=0.8, val_ham_existence_prob=None, train_nr_simultaneous_simulations=4,

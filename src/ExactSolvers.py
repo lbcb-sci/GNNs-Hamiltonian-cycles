@@ -107,9 +107,9 @@ class ConcordeHamiltonSolver(HamiltonSolver):
         return transformed_d, artifiical_node
 
 
-    def solve(self, d: torch_g.data.Data):
+    def solve(self, d: torch_g.data.Data, is_only_look_for_cylce=False):
         hamiltonian_cycle, _, _ = self.time_execution(d)
-        if len(hamiltonian_cycle) > 0:
+        if is_only_look_for_cylce or len(hamiltonian_cycle) > 0:
             return hamiltonian_cycle
 
         ham_path_d, artificial_node = self._transform_path_problem_graph_to_cycles_problem_path(d)

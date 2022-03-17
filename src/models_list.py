@@ -54,3 +54,9 @@ train_request_HamS_graphs_50.arguments["datamodule_hyperparams"].update({"train_
 
 train_request_HamS_graphs_100 = copy.deepcopy(train_request_HamS_model)
 train_request_HamS_graphs_100.arguments["datamodule_hyperparams"].update({"train_graph_size": 50, "val_graph_size": 30})
+
+
+train_request_HamS_ER_exact_solver = copy.deepcopy(train_request_HamS_model)
+train_request_HamS_ER_exact_solver.datamodule_class = DataModules.SolvedErdosRenyiDataModule
+train_request_HamS_ER_exact_solver.arguments["datamodule_hyperparams"].update({"train_hamilton_existence_probability": 0.8})
+del train_request_HamS_ER_exact_solver.arguments["datamodule_hyperparams"]["train_expected_noise_edges_per_node"]

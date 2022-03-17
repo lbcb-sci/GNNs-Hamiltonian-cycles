@@ -93,3 +93,14 @@ class ErdosRenyiGenerator:
 
     def __iter__(self):
         return (self._erdos_renyi_generator() for _ in itertools.count())
+
+
+class ErdosRenyiExamplesGenerator:
+    def __init__(self, num_nodes, hamilton_existence_probability):
+        self.raw_generator = ErdosRenyiGenerator(num_nodes, hamilton_existence_probability)
+
+    def output_details(self):
+        return f"{self.raw_generator.output_details()} packed as {GraphExample.__name__}"
+
+    def __iter__(self):
+        return (GraphExample(graph, None, None) for graph in self.raw_generator)

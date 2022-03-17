@@ -5,6 +5,8 @@ import torch_geometric as torch_geometric
 from typing import Iterable, List
 import random
 
+from ExactSolvers import ConcordeHamiltonSolver
+
 
 def get_shifts_for_graphs_in_batch(batch_graph: torch_geometric.data.Batch):
     batch_graph_one_hot = F.one_hot(batch_graph.batch, batch_graph.num_graphs)
@@ -106,6 +108,21 @@ class GraphGeneratingDataset(torch.utils.data.Dataset):
 
     def __getitem__(self, idx):
         generated_graph_example = next(self.graph_generator)
+        return generated_graph_example
+
+
+class GraphAndSolutionGeneratingDataset(GraphGeneratingDataset):
+    def __init__(self, **kwargs) -> None:
+        super().init(**kwargs)
+        self.solver = ConcordeHamiltonSolver()
+
+    def __getitem__(self, idx):
+        generated_graph_example = super().__getitem__(idx)
+        if generated_graph_example.teacher_path is None:
+            graph = generated_graph_example.graph
+            solution = self.solver.solve(generated_graph_example.graph, is_only_look_for_cylce=True)
+            if len(solution) == graph.num_nodes + 1:
+                generated_graph_example.teacher_path = solution
         return generated_graph_example
 
 
