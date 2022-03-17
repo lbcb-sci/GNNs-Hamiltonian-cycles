@@ -5,6 +5,8 @@ import subprocess
 import textwrap
 from typing import List
 import copy
+import time
+import threading
 
 import torch
 import torch_geometric as torch_g
@@ -13,8 +15,10 @@ from src.HamiltonSolver import HamiltonSolver
 from src.constants import CONCORDE_SCRIPT_PATH, CONCORDE_WORK_DIR, CONCORDE_INPUT_FILE
 
 class ConcordeHamiltonSolver(HamiltonSolver):
-    def __init__(self, root_dir=CONCORDE_WORK_DIR, working_subdir=""):
+    def __init__(self, root_dir=CONCORDE_WORK_DIR, working_subdir=None):
         self.CONCORDE_EXECUTABLE_PATH = CONCORDE_SCRIPT_PATH
+        if working_subdir is None:
+            working_subdir = f"thread-{threading.get_ident()}_time-{time.time_ns()}"
         self.working_dir = os.path.join(root_dir, working_subdir)
         self.CONCORDE_INPUT_FILE = CONCORDE_INPUT_FILE
 
@@ -29,9 +33,9 @@ class ConcordeHamiltonSolver(HamiltonSolver):
     def __del__(self):
         self.clean()
 
-    def create_input_file(self, d: torch_g.data.Data, filename=None, name="Unnamed_instance.tsp"):
-        if filename is None:
-            filename = os.path.join(self.working_dir, self.CONCORDE_INPUT_FILE)
+    def create_input_file(self, d: torch_g.data.Data, filepath=None, name="Unnamed_instance.tsp"):
+        if filepath is None:
+            filepath = os.path.join(self.working_dir, self.CONCORDE_INPUT_FILE)
 
         adjacency = torch.sparse_coo_tensor(
             d.edge_index, torch.ones(d.edge_index.shape[1], dtype=torch.int, device=d.edge_index.device),
@@ -50,7 +54,7 @@ class ConcordeHamiltonSolver(HamiltonSolver):
             EDGE_WEIGHT_FORMAT: FULL_MATRIX
             EDGE_WEIGHT_SECTION
             {}""").format(name, d.num_nodes, weights_str)
-        with open(filename, "w") as out:
+        with open(filepath, "w") as out:
             out.write(out_string)
 
     # INPUT FILE CREATION TAKES A LONG TIME (QUADRATIC COMPLEXITY) SO THE RESULTS CAN BE UNINTUITIVE!
