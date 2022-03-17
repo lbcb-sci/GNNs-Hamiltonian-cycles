@@ -19,7 +19,7 @@ if __name__ == "__main__":
         target_name = "train_request_HamS_larger_graphs"
 
     if target_name in possible_targets:
-        getattr(models_list, target_name).train(run_name=run_name)
+        getattr(models_list, target_name).train(nr_cpu_threads=32, run_name=run_name)
     else:
         print(f"Could not find model request {target_name} to train. Please use one of the following as an argument")
         for possible_target in possible_targets:
