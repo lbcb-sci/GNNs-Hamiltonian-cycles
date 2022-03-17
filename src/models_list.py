@@ -32,6 +32,9 @@ train_request_HamS_model = model_utils.ModelTrainRequest(
     }
 )
 
+train_request_HamS_quick = copy.deepcopy(train_request_HamS_model)
+train_request_HamS_quick.arguments["trainer_hyperparams"].update({"max_epochs": 50})
+
 train_request_HamS_mse_loss = copy.deepcopy(train_request_HamS_model)
 train_request_HamS_mse_loss.arguments["model_hyperparams"].update({"loss_type": "mse"})
 

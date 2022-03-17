@@ -1,11 +1,14 @@
 import datetime
 import itertools
 from inspect import isclass
+import tempfile
+from pathlib import Path
 
 import torch
 import pytorch_lightning as torch_lightning
 import pytorch_lightning.loggers as lightning_loggers
 import pytorch_lightning.callbacks as lightning_callbacks
+import wandb
 
 import src.Models as models
 from src.Evaluation import EvaluationScores
@@ -77,15 +80,35 @@ def train_model(model_class, datamodule_class, model_checkpoint=None, model_hype
             raise train_exception
 
 
-def create_model_for_wandb_run(wandb_run, checkpoint_path):
-    checkpoint = wandb_run.config["checkpoint"]
+def create_model_from_checkpoint(checkpoint_path):
     model_classes = [var for var_name, var in vars(models).items() if isclass(var) and issubclass(var, models.HamFinderGNN)]
     model = None
     for c in model_classes:
         try:
-            model = c.load_from_checkpoint(checkpoint)
+            model = c.load_from_checkpoint(checkpoint_path)
         except:
             pass
+    return model
+
+
+def create_model_for_wandb_run(wandb_run, checkpoint_path):
+    model = None
+    if "checkpoint" in wandb_run.config:
+        try:
+            checkpoint_path = wandb_run.config["checkpoint"]
+            model = create_model_from_checkpoint(checkpoint_path)
+        except Exception as ex:
+            model = None
+
+    if model is not None:
+        try:
+            with tempfile.TemporaryDirectory() as tmp_dir:
+                artifact = wandb_run.use_artifact(f"model-{wandb_run.id}:v1")
+                checkpoint_path = Path(artifact.download(tmp_dir))
+                model = create_model_from_checkpoint(checkpoint_path)
+        except Exception as ex:
+            model = None
+
     return model
 
 
