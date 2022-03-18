@@ -9,20 +9,21 @@ train_request_HamS_model = model_utils.ModelTrainRequest(
     datamodule_class = DataModules.ArtificialCycleDataModule,
     model_checkpoint = None,
     model_hyperparams = {
-        "processor_depth":5,
+        "processor_depth": 5,
         "loss_type": "entropy",
+        "learning_rate": 1e-4
     },
     trainer_hyperparams = {
-        "max_epochs": 200,
+        "max_epochs": 2000,
         "num_sanity_val_steps": 2,
         "log_every_n_steps": 5,
         "check_val_every_n_epoch": 5,
     },
     datamodule_hyperparams = {
-        "train_virtual_epoch_size": 32 * 100,
-        "val_virtual_epoch_size": 32 * 50,
-        "train_batch_size": 32,
-        "val_batch_size": 32,
+        "train_virtual_epoch_size": 8 * 100,
+        "val_virtual_epoch_size": 8 * 50,
+        "train_batch_size": 8,
+        "val_batch_size": 8,
         "train_graph_size": 25,
         "train_expected_noise_edges_per_node": 3,
     },
@@ -57,6 +58,6 @@ train_request_HamS_graphs_100.arguments["datamodule_hyperparams"].update({"train
 
 
 train_request_HamS_ER_exact_solver = copy.deepcopy(train_request_HamS_model)
-train_request_HamS_ER_exact_solver.datamodule_class = DataModules.SolvedErdosRenyiDataModule
+train_request_HamS_ER_exact_solver.arguments["datamodule_class"] = DataModules.SolvedErdosRenyiDataModule
 train_request_HamS_ER_exact_solver.arguments["datamodule_hyperparams"].update({"train_hamilton_existence_probability": 0.8})
 del train_request_HamS_ER_exact_solver.arguments["datamodule_hyperparams"]["train_expected_noise_edges_per_node"]
