@@ -2,7 +2,7 @@ import pytorch_lightning as torch_lightning
 
 import src.constants as constants
 from src.data.InMemoryDataset import ErdosRenyiInMemoryDataset
-from src.data.GraphDataset import GraphAndSolutionGeneratingDataset, GraphGeneratingDataset, GraphDataLoader, SimulationStatesDataLoader, SimulationsDataset
+from src.data.GraphDataset import FilterSolvableGraphsGeneratingDataset, GraphGeneratingDataset, GraphDataLoader, SimulationStatesDataLoader, SimulationsDataset
 from src.data.GraphGenerators import ErdosRenyiExamplesGenerator, ErdosRenyiGenerator, NoisyCycleGenerator
 
 
@@ -74,11 +74,11 @@ class SolvedErdosRenyiDataModule(TestWithLocalDatasetDataModule):
 
     def train_dataloader(self):
         generator = ErdosRenyiExamplesGenerator(self.train_graph_size, self.train_hamilton_existence_probability)
-        return GraphDataLoader(GraphAndSolutionGeneratingDataset(generator, self.train_virtual_epoch_size), batch_size=self.train_batch_size)
+        return GraphDataLoader(FilterSolvableGraphsGeneratingDataset(generator, self.train_virtual_epoch_size), batch_size=self.train_batch_size)
 
     def val_dataloader(self):
         generator = ErdosRenyiExamplesGenerator(self.val_graph_size, self.val_hamilton_existence_probability)
-        return GraphDataLoader(GraphAndSolutionGeneratingDataset(generator, self.val_virtual_epoch_size), batch_size=self.val_batch_size)
+        return GraphDataLoader(FilterSolvableGraphsGeneratingDataset(generator, self.val_virtual_epoch_size), batch_size=self.val_batch_size)
 
 
 class ReinforcementErdosRenyiDataModule(TestWithLocalDatasetDataModule):

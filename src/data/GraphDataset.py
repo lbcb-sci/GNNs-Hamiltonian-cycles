@@ -5,6 +5,8 @@ import torch_geometric as torch_geometric
 from typing import Iterable, List
 import random
 
+from zmq import device
+
 from ExactSolvers import ConcordeHamiltonSolver
 
 
@@ -98,8 +100,8 @@ class BatchedSimulationStates:
 
 
 class GraphGeneratingDataset(torch.utils.data.Dataset):
-    def __init__(self, graph_generator, virtual_epoch_size=1000, ) -> None:
-        super().__init__()
+    def __init__(self, graph_generator, virtual_epoch_size=1000, **kwargs) -> None:
+        super().__init__(**kwargs)
         self.graph_generator = iter(graph_generator)
         self.virtual_epoch_size = virtual_epoch_size
 
@@ -111,19 +113,27 @@ class GraphGeneratingDataset(torch.utils.data.Dataset):
         return generated_graph_example
 
 
-class GraphAndSolutionGeneratingDataset(GraphGeneratingDataset):
-    def __init__(self, **kwargs) -> None:
-        super().init(**kwargs)
+class FilterSolvableGraphsGeneratingDataset(torch.utils.data.Dataset):
+    def __init__(self, graph_generator: Iterable[GraphExample], virtual_epoch_size=1000, **kwargs) -> None:
+        self.graph_generator = iter(graph_generator)
+        self.virtual_epoch_size = virtual_epoch_size
         self.solver = ConcordeHamiltonSolver()
+        super().__init__(**kwargs)
+
+    def __len__(self):
+        return self.virtual_epoch_size
 
     def __getitem__(self, idx):
-        generated_graph_example = super().__getitem__(idx)
-        if generated_graph_example.teacher_path is None:
-            graph = generated_graph_example.graph
-            solution = self.solver.solve(generated_graph_example.graph, is_only_look_for_cylce=True)
-            if len(solution) == graph.num_nodes + 1:
-                generated_graph_example.teacher_path = solution
-        return generated_graph_example
+        while (True):
+            generated_graph_example = next(self.graph_generator)
+            if generated_graph_example.teacher_path is None:
+                graph = generated_graph_example.graph
+                solution = self.solver.solve(generated_graph_example.graph, is_only_look_for_cylce=True)
+                if len(solution) != graph.num_nodes + 1:
+                    continue
+                else:
+                    generated_graph_example.teacher_path = torch.tensor(solution, dtype=graph.edge_index.dtype, device=graph.edge_index.device)
+                    return generated_graph_example
 
 
 class GraphDataLoader(torch.utils.data.DataLoader):
