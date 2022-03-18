@@ -63,6 +63,17 @@ def train_model(model_class, datamodule_class, model_checkpoint=None, model_hype
 
     trainer = torch_lightning.Trainer(**trainer_hyperparams)
 
+    if "auto_lr_find" in trainer_hyperparams:
+        print("Automatic lr enabled, computing...")
+        lr_find_kwargs = {"min_lr": 1e-9, "max_lr": 1e-2, "num_training": 100, "early_stop_threshold": 5, "mode":"linear"}
+        lr_finder = trainer.tune(model, datamodule=datamodule, lr_find_kwargs=lr_find_kwargs)["lr_find"]
+        fig = lr_finder.plot(suggest=True)
+        suggested_lr = lr_finder.suggestion()
+        print(f"Using suggested lr: {suggested_lr}")
+        # TODO remove wandb.Image after installing plotly into env. Wandb crashes without plotly
+        wandb_logger.experiment.log({"lr_find_plot": wandb.Image(fig)})
+        wandb_logger.experiment.config.update({"adjusted_learning_rate": model.learning_rate})
+
     train_parameters.update({
         "model": model,
         "datamodule": datamodule

@@ -61,3 +61,7 @@ train_request_HamS_ER_exact_solver = copy.deepcopy(train_request_HamS_model)
 train_request_HamS_ER_exact_solver.arguments["datamodule_class"] = DataModules.SolvedErdosRenyiDataModule
 train_request_HamS_ER_exact_solver.arguments["datamodule_hyperparams"].update({"train_hamilton_existence_probability": 0.8})
 del train_request_HamS_ER_exact_solver.arguments["datamodule_hyperparams"]["train_expected_noise_edges_per_node"]
+
+
+train_request_HamS_automatic_lr = copy.deepcopy(train_request_HamS_model)
+train_request_HamS_automatic_lr.arguments["trainer_hyperparams"]["auto_lr_find"] = True
