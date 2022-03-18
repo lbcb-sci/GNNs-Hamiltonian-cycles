@@ -259,8 +259,8 @@ class EncodeProcessDecodeAlgorithm(HamFinderGNN):
         return encoder_nn, decoder_nn
 
     def __init__(self, processor_depth=3, in_dim=1, out_dim=1, hidden_dim=32, graph_updater_class=WalkUpdater,
-                 loss_type="mse"):
-        super().__init__(graph_updater_class)
+                 loss_type="mse", **kwargs):
+        super().__init__(graph_updater_class, **kwargs)
         self.save_hyperparameters()
 
         self.in_dim = in_dim
@@ -372,8 +372,8 @@ class EmbeddingAndMaxMPNN(HamCycleFinderWithValueFunction):
 
     def __init__(self, in_dim=3, out_dim=2, hidden_dim=32, embedding_depth=5, processor_depth=5,
                  value_function_weight=1, l2_regularization_weight=0.01, nr_simultaneous_simulations=8,
-                 loss_type="mse", graph_updater_class=WalkUpdater, solution_scorer_class=scorers.SizeIndependentCombinatorialScorer):
-        super().__init__(graph_updater_class)
+                 loss_type="mse", graph_updater_class=WalkUpdater, solution_scorer_class=scorers.SizeIndependentCombinatorialScorer, **kwargs):
+        super().__init__(graph_updater_class, **kwargs)
         self.save_hyperparameters()
 
         self.scorer = solution_scorer_class()
