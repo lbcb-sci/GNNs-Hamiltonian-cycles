@@ -59,7 +59,10 @@ def train_model(model_class, datamodule_class, model_checkpoint=None, model_hype
     model_checkpoint_hyperparams["save_last"] = True
     checkpoint_callback = lightning_callbacks.ModelCheckpoint(**model_checkpoint_hyperparams)
     callbacks = [checkpoint_callback]
-    trainer_hyperparams["callbacks"] = callbacks
+    if "callbacks" in trainer_hyperparams:
+        trainer_hyperparams["callbacks"].extend(callbacks)
+    else:
+        trainer_hyperparams["callbacks"] = callbacks
 
     trainer = torch_lightning.Trainer(**trainer_hyperparams)
 
