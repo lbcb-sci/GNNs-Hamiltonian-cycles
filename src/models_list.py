@@ -1,5 +1,6 @@
 import copy
 
+from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts
 from pytorch_lightning.callbacks import LearningRateMonitor
 
 import src.Models as Models
@@ -69,3 +70,12 @@ del train_request_HamS_ER_exact_solver.arguments["datamodule_hyperparams"]["trai
 train_request_HamS_automatic_lr = copy.deepcopy(train_request_HamS_model)
 train_request_HamS_automatic_lr.arguments["trainer_hyperparams"]["auto_lr_find"] = True
 train_request_HamS_automatic_lr.arguments["trainer_hyperparams"]["track_grad_norm"] = 2
+
+
+train_request_HamS_cosine_annealing = copy.deepcopy(train_request_HamS_model)
+train_request_HamS_cosine_annealing.arguments["model_hyperparams"]["lr_scheduler_class"] = CosineAnnealingWarmRestarts
+train_request_HamS_cosine_annealing.arguments["model_hyperparams"]["starting_learning_rate"] = 5*1e-3
+train_request_HamS_cosine_annealing.arguments["model_hyperparams"]["lr_scheduler_hyperparams"] = {
+    "T_0": 250,
+    "eta_min": 1e-6,
+}
