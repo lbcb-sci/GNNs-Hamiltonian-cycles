@@ -38,12 +38,13 @@ class WalkUpdater:
 
 class HamFinderGNN(HamiltonSolver, torch_lightning.LightningModule):
     def __init__(self, graph_updater_class: WalkUpdater,
-                 inference_batch_size=8, optimizer_class=None, optimizer_hyperparams=None, lr_scheduler_class=None, lr_scheduler_hyperparams=None):
+                 inference_batch_size=8, starting_learning_rate=1e-4, optimizer_class=None, optimizer_hyperparams=None, lr_scheduler_class=None, lr_scheduler_hyperparams=None):
         super(HamFinderGNN, self).__init__()
         self.graph_updater = graph_updater_class()
         self._inference_batch_size = inference_batch_size
         self.optimizer_class = optimizer_class
         self.optimizer_hyperparams = optimizer_hyperparams
+        self.learning_rate = starting_learning_rate
         self.lr_scheduler_class = lr_scheduler_class
         self.lr_scheduler_hyperparams = lr_scheduler_hyperparams
 
@@ -242,7 +243,6 @@ class HamFinderGNN(HamiltonSolver, torch_lightning.LightningModule):
 
     def configure_optimizers(self):
         if self.optimizer_class is None:
-            self.learning_rate = 1e-4
             optimizer = torch.optim.Adam(self.parameters(), self.learning_rate)
         else:
             optimizer = self.optimizer_class(**self.optimizer_hyperparams)
