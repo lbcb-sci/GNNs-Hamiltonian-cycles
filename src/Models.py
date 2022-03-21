@@ -249,7 +249,7 @@ class HamFinderGNN(HamiltonSolver, torch_lightning.LightningModule):
         config_dict = {"optimizer": optimizer}
 
         if self.lr_scheduler_class is not None:
-            lr_scheduler = self.lr_scheduler_class(**self.lr_scheduler_hyperparams)
+            lr_scheduler = self.lr_scheduler_class(optimizer, **self.lr_scheduler_hyperparams)
             config_dict.update({"lr_scheduler": lr_scheduler})
 
         return config_dict
