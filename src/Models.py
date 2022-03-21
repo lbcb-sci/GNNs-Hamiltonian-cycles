@@ -303,16 +303,19 @@ class EncodeProcessDecodeAlgorithm(HamFinderGNN):
                 self.loss = torch.zeros(1, device=self.batch_graph.edge_index.device)
                 graph_shifts = get_shifts_for_graphs_in_batch(batch_graph)
                 self.teacher_tensor = torch.stack(teacher_paths, 0)
+                self._logits_per_step = []
 
                 if self.gnn_model.loss_type == "mse":
                     mse_weights = F.normalize(F.one_hot(batch_graph.batch, batch_graph.num_graphs).float(), 1, 0).sum(-1)
                     def _compute_loss(logits, probabilities, step_number, is_algorithm_stopped_mask):
+                        self._logits_per_step.append(logits)
                         mse_loss = torch.nn.MSELoss(reduction="none")
                         teacher_p = torch.zeros_like(probabilities)
                         teacher_p[self.teacher_tensor[:, step_number]] = 1
                         return (mse_loss(probabilities, teacher_p) * mse_weights).sum()
                 elif self.gnn_model.loss_type == "entropy":
                     def _compute_loss(logits, probabilites, step_number, is_algorithm_stopped_mask):
+                        self._logits_per_step.append(logits)
                         entropy_loss = torch.nn.CrossEntropyLoss()
                         subgraph_losses = []
                         for subgraph_index in range(len(graph_shifts)):
@@ -345,6 +348,7 @@ class EncodeProcessDecodeAlgorithm(HamFinderGNN):
         self._run_on_graph_batch(batch_graph, run_instructions)
 
         avg_loss = run_instructions.loss / run_instructions.teacher_tensor.nelement()
+        self.logits_per_step = run_instructions._logits_per_step
         self.log("train/loss", avg_loss)
         return avg_loss
 
