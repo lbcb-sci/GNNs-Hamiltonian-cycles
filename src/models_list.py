@@ -1,8 +1,11 @@
 import copy
 
+from pytorch_lightning.callbacks import LearningRateMonitor
+
 import src.Models as Models
 import src.data.DataModules as DataModules
 import src.model_utils as model_utils
+import src.callbacks as my_callbacks
 
 train_request_HamS_model = model_utils.ModelTrainRequest(
     model_class = Models.EncodeProcessDecodeAlgorithm,
@@ -11,7 +14,6 @@ train_request_HamS_model = model_utils.ModelTrainRequest(
     model_hyperparams = {
         "processor_depth": 5,
         "loss_type": "entropy",
-        "learning_rate": 1e-4
     },
     trainer_hyperparams = {
         "max_epochs": 2000,
@@ -32,6 +34,7 @@ train_request_HamS_model = model_utils.ModelTrainRequest(
         "dirpath": None,
     }
 )
+train_request_HamS_model.arguments["trainer_hyperparams"]["callbacks"] = [LearningRateMonitor(logging_interval="step"), my_callbacks.callback_max_logits_2_norm, my_callbacks.callback_max_weights_2_norm]
 
 train_request_HamS_quick = copy.deepcopy(train_request_HamS_model)
 train_request_HamS_quick.arguments["trainer_hyperparams"].update({"max_epochs": 50})
@@ -65,3 +68,4 @@ del train_request_HamS_ER_exact_solver.arguments["datamodule_hyperparams"]["trai
 
 train_request_HamS_automatic_lr = copy.deepcopy(train_request_HamS_model)
 train_request_HamS_automatic_lr.arguments["trainer_hyperparams"]["auto_lr_find"] = True
+train_request_HamS_automatic_lr.arguments["trainer_hyperparams"]["track_grad_norm"] = 2

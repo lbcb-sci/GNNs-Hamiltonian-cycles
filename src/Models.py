@@ -1,7 +1,6 @@
 import itertools
 import os.path
 from abc import ABC, abstractmethod
-from random import choice
 import numpy
 
 import torch
@@ -38,12 +37,15 @@ class WalkUpdater:
 
 
 class HamFinderGNN(HamiltonSolver, torch_lightning.LightningModule):
-    def __init__(self, graph_updater_class: WalkUpdater, learning_rate=1e-4,
-                 inference_batch_size=8):
+    def __init__(self, graph_updater_class: WalkUpdater,
+                 inference_batch_size=8, optimizer_class=None, optimizer_hyperparams=None, lr_scheduler_class=None, lr_scheduler_hyperparams=None):
         super(HamFinderGNN, self).__init__()
         self.graph_updater = graph_updater_class()
-        self.learning_rate = learning_rate
         self._inference_batch_size = inference_batch_size
+        self.optimizer_class = optimizer_class
+        self.optimizer_hyperparams = optimizer_hyperparams
+        self.lr_scheduler_class = lr_scheduler_class
+        self.lr_scheduler_hyperparams = lr_scheduler_hyperparams
 
         self.log_train_tag = "train"
         self.log_val_tag = "val"
@@ -239,7 +241,18 @@ class HamFinderGNN(HamiltonSolver, torch_lightning.LightningModule):
         return super().on_test_epoch_end()
 
     def configure_optimizers(self):
-        return torch.optim.Adam(self.parameters(), self.learning_rate)
+        if self.optimizer_class is None:
+            self.learning_rate = 1e-4
+            optimizer = torch.optim.Adam(self.parameters(), self.learning_rate)
+        else:
+            optimizer = self.optimizer_class(**self.optimizer_hyperparams)
+        config_dict = {"optimizer": optimizer}
+
+        if self.lr_scheduler_class is not None:
+            lr_scheduler = self.lr_scheduler_class(**self.lr_scheduler_hyperparams)
+            config_dict.update({"lr_scheduler": lr_scheduler})
+
+        return config_dict
 
 
 class HamCycleFinderWithValueFunction(HamFinderGNN):
