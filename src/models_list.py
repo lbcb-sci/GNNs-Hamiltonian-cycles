@@ -21,7 +21,6 @@ train_request_HamS_model = model_utils.ModelTrainRequest(
         "num_sanity_val_steps": 2,
         "log_every_n_steps": 5,
         "check_val_every_n_epoch": 5,
-        "gradient_clip_val": 0.05,
         "gradient_clip_algorithm": "norm",
     },
     datamodule_hyperparams = {
@@ -70,15 +69,17 @@ train_request_HamS_ER_exact_solver.arguments["datamodule_class"] = DataModules.S
 train_request_HamS_ER_exact_solver.arguments["datamodule_hyperparams"].update({"train_hamilton_existence_probability": 0.8})
 del train_request_HamS_ER_exact_solver.arguments["datamodule_hyperparams"]["train_expected_noise_edges_per_node"]
 
+train_request_HamS_grad_clipping = copy.deepcopy(train_request_HamS_model)
+train_request_HamS_grad_clipping.arguments["trainer_hyperparams"]["gradient_clip_val"] = 1
 
-train_request_HamS_automatic_lr = copy.deepcopy(train_request_HamS_model)
+train_request_HamS_automatic_lr = copy.deepcopy(train_request_HamS_grad_clipping)
 train_request_HamS_automatic_lr.arguments["trainer_hyperparams"]["auto_lr_find"] = True
 train_request_HamS_automatic_lr.arguments["trainer_hyperparams"]["track_grad_norm"] = 2
 
 
-train_request_HamS_cosine_annealing = copy.deepcopy(train_request_HamS_model)
+train_request_HamS_cosine_annealing = copy.deepcopy(train_request_HamS_grad_clipping)
 train_request_HamS_cosine_annealing.arguments["model_hyperparams"]["lr_scheduler_class"] = CosineAnnealingWarmRestarts
-train_request_HamS_cosine_annealing.arguments["model_hyperparams"]["starting_learning_rate"] = 5*1e-3
+train_request_HamS_cosine_annealing.arguments["model_hyperparams"]["starting_learning_rate"] = 2*1e-3
 train_request_HamS_cosine_annealing.arguments["model_hyperparams"]["lr_scheduler_hyperparams"] = {
     "T_0": 250,
     "eta_min": 1e-6,
