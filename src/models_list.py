@@ -21,6 +21,8 @@ train_request_HamS_model = model_utils.ModelTrainRequest(
         "num_sanity_val_steps": 2,
         "log_every_n_steps": 5,
         "check_val_every_n_epoch": 5,
+        "gradient_clip_val": 0.05,
+        "gradient_clip_algorithm": "norm",
     },
     datamodule_hyperparams = {
         "train_virtual_epoch_size": 8 * 100,
@@ -35,7 +37,9 @@ train_request_HamS_model = model_utils.ModelTrainRequest(
         "dirpath": None,
     }
 )
-train_request_HamS_model.arguments["trainer_hyperparams"]["callbacks"] = [LearningRateMonitor(logging_interval="step"), my_callbacks.callback_max_logits_2_norm, my_callbacks.callback_max_weights_2_norm]
+train_request_HamS_model.arguments["trainer_hyperparams"]["callbacks"] = [LearningRateMonitor(logging_interval="step")] \
+    + [my_callbacks.create_lp_callback(target_type, p_norm) for target_type
+       in ["max_lp_logits", "max_lp_weights", "max_lp_gradients", "flat_lp_gradients"] for p_norm in [2.1, 1.2, 2, 2.2, 5, 15]]
 
 train_request_HamS_quick = copy.deepcopy(train_request_HamS_model)
 train_request_HamS_quick.arguments["trainer_hyperparams"].update({"max_epochs": 50})
@@ -79,3 +83,7 @@ train_request_HamS_cosine_annealing.arguments["model_hyperparams"]["lr_scheduler
     "T_0": 250,
     "eta_min": 1e-6,
 }
+
+_debug_large_lr = copy.deepcopy(train_request_HamS_model)
+_debug_large_lr.arguments["model_hyperparams"]["starting_learning_rate"] = 0.012
+# _debug_large_lr.arguments["trainer_hyperparams"]["track_grad_norm"] = 2
