@@ -92,3 +92,11 @@ train_request_HamS_cosine_annealing.arguments["model_hyperparams"]["lr_scheduler
 _debug_large_lr = copy.deepcopy(train_request_HamS_model)
 _debug_large_lr.arguments["model_hyperparams"]["starting_learning_rate"] = 0.012
 # _debug_large_lr.arguments["trainer_hyperparams"]["track_grad_norm"] = 2
+
+_debug_with_multiple_dataloaders = copy.deepcopy(train_request_HamS_model)
+_debug_with_multiple_dataloaders.arguments["model_hyperparams"]["val_dataloader_tags"] = ["artificial", "ER"]
+_debug_with_multiple_dataloaders.arguments["datamodule_class"] = DataModules.ArtificialCycleWithDoubleEvaluationDataModule
+_debug_with_multiple_dataloaders.arguments["datamodule_hyperparams"].update({
+    "val_hamiltonian_existence_probability": 0.8,
+    "val_virtual_epoch_size": 80,
+})

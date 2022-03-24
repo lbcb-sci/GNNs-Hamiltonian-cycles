@@ -38,7 +38,7 @@ class WalkUpdater:
 
 class HamFinderGNN(HamiltonSolver, torch_lightning.LightningModule):
     def __init__(self, graph_updater_class: WalkUpdater,
-                 inference_batch_size=8, starting_learning_rate=1e-4, optimizer_class=None, optimizer_hyperparams=None, lr_scheduler_class=None, lr_scheduler_hyperparams=None):
+                 inference_batch_size=8, starting_learning_rate=1e-4, optimizer_class=None, optimizer_hyperparams=None, lr_scheduler_class=None, lr_scheduler_hyperparams=None, val_dataloader_tags=None):
         super(HamFinderGNN, self).__init__()
         self.graph_updater = graph_updater_class()
         self._inference_batch_size = inference_batch_size
@@ -47,15 +47,12 @@ class HamFinderGNN(HamiltonSolver, torch_lightning.LightningModule):
         self.learning_rate = starting_learning_rate
         self.lr_scheduler_class = lr_scheduler_class
         self.lr_scheduler_hyperparams = lr_scheduler_hyperparams
+        self.val_dataloader_tags = val_dataloader_tags
 
         self.log_train_tag = "train"
         self.log_val_tag = "val"
         self.log_test_tag = "test"
-        self.validation_accuracy_metrics, self.test_accuracy_metrics = \
-            [torch.nn.ModuleDict({
-                name: torchmetrics.Accuracy(compute_on_step=False)
-                for name in ("hamiltonian_cycle", "hamiltonian_path", "90_perc_cycle", "90_perc_path")}
-                                 ) for _ in range(2)]
+        self.accuracy_metrics_central_dict = dict()
 
     @abstractmethod
     def raw_next_step_logits(self, d: torch_g.data.Batch) -> torch.Tensor:
@@ -210,35 +207,51 @@ class HamFinderGNN(HamiltonSolver, torch_lightning.LightningModule):
             walks.extend(self.solve_batch_graph(batch_graph, subgraph_sizes))
         return walks
 
-    def update_accuracy_metrics(self, accuracy_metrics_dict: dict[str, torchmetrics.Accuracy], graphs: list[torch_g.data.Data], solutions: list[list[int]]):
+    def update_accuracy_metrics(self, accuracy_metrics_tag: str, graphs: list[torch_g.data.Data], solutions: list[list[int]]):
+        if accuracy_metrics_tag not in self.accuracy_metrics_central_dict:
+            self.accuracy_metrics_central_dict[accuracy_metrics_tag] = torch.nn.ModuleDict({
+                name: torchmetrics.Accuracy(compute_on_step=False)
+                for name in ("hamiltonian_cycle", "hamiltonian_path", "90_perc_cycle", "90_perc_path")})
+        accuracy_metrics = self.accuracy_metrics_central_dict[accuracy_metrics_tag]
+
         evals = Evaluation.EvaluationScores.evaluate(graphs, solutions)
         df_scores = Evaluation.EvaluationScores.compute_scores(evals)
         for metric_name, column_name in [("hamiltonian_cycle", "is_ham_cycle"), ("hamiltonian_path", "is_ham_path"),
                                          ("90_perc_cycle", "is_approx_ham_cycle"), ("90_perc_path", "is_approx_ham_path")]:
-            if metric_name in accuracy_metrics_dict:
-                metric = accuracy_metrics_dict[metric_name]
+            if metric_name in accuracy_metrics:
+                metric = accuracy_metrics[metric_name]
                 prediction = torch.tensor(df_scores[column_name], dtype=torch.float)
                 metric.update(prediction, torch.ones_like(prediction, dtype=torch.int))
 
-    def log_validation_accuracy_metrics(self):
-        for metric_name, metric in self.validation_accuracy_metrics.items():
-            self.log(f"validation/{metric_name}", metric.compute())
+    def log_accuracy_metric(self, accuracy_metrics_tag):
+        accuracy_metrics = self.accuracy_metrics_central_dict[accuracy_metrics_tag]
+        for metric_name, metric in accuracy_metrics.items():
+            self.log(f"{accuracy_metrics_tag}/{metric_name}", metric.compute())
             metric.reset()
 
-    def _test_and_update_accuracy_metrics(self, graph_batch_dict, accuracy_metrics):
+    def get_validation_dataloader_tag(self, dataloader_idx):
+        dataloader_subtag = f"{dataloader_idx}"
+        if self.val_dataloader_tags is not None and dataloader_idx < len(self.val_dataloader_tags):
+            dataloader_subtag = self.val_dataloader_tags[dataloader_idx]
+        return f"{self.log_val_tag}/{dataloader_subtag}"
+
+    def on_validation_epoch_end(self) -> None:
+        for tag, accuracy_metrics in self.accuracy_metrics_central_dict.items():
+            if tag.startswith(self.log_val_tag):
+                self.log_accuracy_metric(tag)
+
+    def _compute_and_update_accuracy_metrics(self, graph_batch_dict, accuracy_metrics_tag):
         batch_graph, _ = self._unpack_graph_batch_dict(graph_batch_dict)
         walks = self.solve_batch_graph(batch_graph)
         graph_list = batch_graph.to_data_list()
-        self.update_accuracy_metrics(accuracy_metrics, graph_list, walks)
+        self.update_accuracy_metrics(accuracy_metrics_tag, graph_list, walks)
 
-    def test_step(self, graph_batch_dict, batch_idx, dataloader_idx=None):
+    def test_step(self, graph_batch_dict, batch_idx, dataloader_idx=0):
         with torch.no_grad():
-            self._test_and_update_accuracy_metrics(graph_batch_dict, self.test_accuracy_metrics)
+            self._compute_and_update_accuracy_metrics(graph_batch_dict, self.log_test_tag)
 
     def on_test_epoch_end(self, *args, **kwargs) -> None:
-        for metric_name, metric in self.test_accuracy_metrics.items():
-            self.log(f"{self.log_test_tag}/{metric_name}", metric.compute())
-            metric.reset()
+        self.log_accuracy_metric(self, self.log_test_tag)
         return super().on_test_epoch_end()
 
     def configure_optimizers(self):
@@ -365,15 +378,13 @@ class EncodeProcessDecodeAlgorithm(HamFinderGNN):
         self.log("train/loss", avg_loss)
         return avg_loss
 
-    def validation_step(self, graph_batch_dict, dataloader_idx):
+    def validation_step(self, graph_batch_dict, batch_idx, dataloader_idx=0):
+        dataloader_tag = self.get_validation_dataloader_tag(dataloader_idx)
         with torch.no_grad():
             loss = self.training_step(graph_batch_dict)
-            self.log("validation/loss", loss)
-            self._test_and_update_accuracy_metrics(graph_batch_dict, self.validation_accuracy_metrics)
+            self.log(f"{dataloader_tag}/loss", loss)
+            self._compute_and_update_accuracy_metrics(graph_batch_dict, dataloader_tag)
             return loss
-
-    def on_validation_epoch_end(self) -> None:
-        self.log_validation_accuracy_metrics()
 
 
 class EmbeddingAndMaxMPNN(HamCycleFinderWithValueFunction):
@@ -458,7 +469,7 @@ class EmbeddingAndMaxMPNN(HamCycleFinderWithValueFunction):
         self._validation_nr_different_graphs_seen = 0
         return super().on_validation_start()
 
-    def validation_step(self, simulations_dict, *args, **kwargs):
+    def validation_step(self, simulations_dict, batch_ids, dataloader_idx):
         with torch.no_grad():
             loss = self.training_step(simulations_dict)
             self.log("validation/loss", loss)
@@ -467,7 +478,7 @@ class EmbeddingAndMaxMPNN(HamCycleFinderWithValueFunction):
             if len(graphs) > 0:
                 self._validation_nr_different_graphs_seen += len(graphs)
                 batch_example = GraphBatchExample.from_graph_examples_list([GraphExample(graph, None) for graph in graphs])
-                self._test_and_update_accuracy_metrics(batch_example.to_lightning_dict(), self.validation_accuracy_metrics)
+                self._compute_and_update_accuracy_metrics(batch_example.to_lightning_dict(), self.validation_accuracy_metrics)
         return loss
 
     def on_validation_epoch_end(self) -> None:
