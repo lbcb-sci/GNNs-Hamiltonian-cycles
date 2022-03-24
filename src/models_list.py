@@ -15,6 +15,7 @@ train_request_HamS_model = model_utils.ModelTrainRequest(
     model_hyperparams = {
         "processor_depth": 5,
         "loss_type": "entropy",
+        "starting_learning_rate": 1e-4
     },
     trainer_hyperparams = {
         "max_epochs": 2000,
@@ -72,6 +73,9 @@ del train_request_HamS_ER_exact_solver.arguments["datamodule_hyperparams"]["trai
 train_request_HamS_grad_clipping = copy.deepcopy(train_request_HamS_model)
 train_request_HamS_grad_clipping.arguments["trainer_hyperparams"]["gradient_clip_val"] = 1
 
+train_request_HamS_custom_lr = copy.deepcopy(train_request_HamS_model)
+train_request_HamS_custom_lr.arguments["model_hyperparams"]["starting_learning_rate"] = 1e-5
+
 train_request_HamS_automatic_lr = copy.deepcopy(train_request_HamS_grad_clipping)
 train_request_HamS_automatic_lr.arguments["trainer_hyperparams"]["auto_lr_find"] = True
 train_request_HamS_automatic_lr.arguments["trainer_hyperparams"]["track_grad_norm"] = 2
@@ -79,9 +83,9 @@ train_request_HamS_automatic_lr.arguments["trainer_hyperparams"]["track_grad_nor
 
 train_request_HamS_cosine_annealing = copy.deepcopy(train_request_HamS_grad_clipping)
 train_request_HamS_cosine_annealing.arguments["model_hyperparams"]["lr_scheduler_class"] = CosineAnnealingWarmRestarts
-train_request_HamS_cosine_annealing.arguments["model_hyperparams"]["starting_learning_rate"] = 2*1e-3
+train_request_HamS_cosine_annealing.arguments["model_hyperparams"]["starting_learning_rate"] = 2*1e-4
 train_request_HamS_cosine_annealing.arguments["model_hyperparams"]["lr_scheduler_hyperparams"] = {
-    "T_0": 250,
+    "T_0": 400,
     "eta_min": 1e-6,
 }
 
