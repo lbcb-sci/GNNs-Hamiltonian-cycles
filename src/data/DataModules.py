@@ -60,6 +60,23 @@ class ArtificialCycleDataModule(TestWithLocalDatasetDataModule):
         return GraphDataLoader(GraphGeneratingDataset(generator, self.val_virtual_epoch_size), batch_size=self.val_batch_size)
 
 
+class ArtificialCycleWithDoubleEvaluationDataModule(ArtificialCycleDataModule):
+    def __init__(self, train_expected_noise_edges_per_node, val_hamiltonian_existence_probability, val_expected_noise_edges_per_node=None, *args, **kwargs):
+        self.val_hamiltonian_existence_probabilty = val_hamiltonian_existence_probability
+        super().__init__(train_expected_noise_edges_per_node, val_expected_noise_edges_per_node, *args, **kwargs)
+
+    def prepare_data(self) -> None:
+        return super().prepare_data()
+
+    def setup(self, stage=None) -> None:
+        return super().setup(stage)
+
+    def val_dataloader(self):
+        dataloader_like_train = super().val_dataloader()
+        generator_like_test = ErdosRenyiExamplesGenerator(self.val_graph_size, self.val_hamiltonian_existence_probabilty)
+        dataloader_like_test = GraphDataLoader(FilterSolvableGraphsGeneratingDataset(generator_like_test, self.val_virtual_epoch_size), batch_size=self.val_batch_size)
+        return dataloader_like_train, dataloader_like_test
+
 class SolvedErdosRenyiDataModule(TestWithLocalDatasetDataModule):
     def __init__(self, train_hamilton_existence_probability, val_hamilton_existence_probability=None, *args, **kwargs):
         self.train_hamilton_existence_probability = train_hamilton_existence_probability
