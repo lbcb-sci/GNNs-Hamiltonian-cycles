@@ -230,10 +230,14 @@ class HamFinderGNN(HamiltonSolver, torch_lightning.LightningModule):
             metric.reset()
 
     def get_validation_dataloader_tag(self, dataloader_idx):
-        dataloader_subtag = f"{dataloader_idx}"
-        if self.val_dataloader_tags is not None and dataloader_idx < len(self.val_dataloader_tags):
-            dataloader_subtag = self.val_dataloader_tags[dataloader_idx]
-        return f"{self.log_val_tag}/{dataloader_subtag}"
+        dataloader_subtag = f"/{dataloader_idx}"
+        if self.val_dataloader_tags is None:
+            if dataloader_idx == 0:
+                dataloader_subtag = ""
+        else:
+            if dataloader_idx < len(self.val_dataloader_tags):
+                dataloader_subtag = f"/{self.val_dataloader_tags[dataloader_idx]}"
+        return f"{self.log_val_tag}{dataloader_subtag}"
 
     def on_validation_epoch_end(self) -> None:
         for tag, accuracy_metrics in self.accuracy_metrics_central_dict.items():

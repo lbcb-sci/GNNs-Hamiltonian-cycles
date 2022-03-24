@@ -10,12 +10,13 @@ import src.callbacks as my_callbacks
 
 train_request_HamS_model = model_utils.ModelTrainRequest(
     model_class = Models.EncodeProcessDecodeAlgorithm,
-    datamodule_class = DataModules.ArtificialCycleDataModule,
+    datamodule_class = DataModules.ArtificialCycleWithDoubleEvaluationDataModule,
     model_checkpoint = None,
     model_hyperparams = {
         "processor_depth": 5,
         "loss_type": "entropy",
-        "starting_learning_rate": 1e-4
+        "starting_learning_rate": 1e-4,
+        "val_dataloader_tags": ["artificial", "ER"]
     },
     trainer_hyperparams = {
         "max_epochs": 2000,
@@ -31,6 +32,7 @@ train_request_HamS_model = model_utils.ModelTrainRequest(
         "val_batch_size": 8,
         "train_graph_size": 25,
         "train_expected_noise_edges_per_node": 3,
+        "val_hamiltonian_existence_probability": 0.8,
     },
     model_checkpoint_hyperparams = {
         "every_n_epochs": 1,
@@ -94,6 +96,7 @@ _debug_large_lr.arguments["model_hyperparams"]["starting_learning_rate"] = 0.012
 # _debug_large_lr.arguments["trainer_hyperparams"]["track_grad_norm"] = 2
 
 _debug_with_multiple_dataloaders = copy.deepcopy(train_request_HamS_model)
+_debug_with_multiple_dataloaders.arguments["trainer_hyperparams"]["max_epochs"] = 25
 _debug_with_multiple_dataloaders.arguments["model_hyperparams"]["val_dataloader_tags"] = ["artificial", "ER"]
 _debug_with_multiple_dataloaders.arguments["datamodule_class"] = DataModules.ArtificialCycleWithDoubleEvaluationDataModule
 _debug_with_multiple_dataloaders.arguments["datamodule_hyperparams"].update({
