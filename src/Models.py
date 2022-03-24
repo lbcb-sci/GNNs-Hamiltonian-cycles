@@ -262,7 +262,7 @@ class HamFinderGNN(HamiltonSolver, torch_lightning.LightningModule):
         if self.optimizer_class is None:
             optimizer = torch.optim.Adam(self.parameters(), self.learning_rate)
         else:
-            optimizer = self.optimizer_class(**self.optimizer_hyperparams)
+            optimizer = self.optimizer_class(self.parameters(), **self.optimizer_hyperparams)
         config_dict = {"optimizer": optimizer}
 
         if self.lr_scheduler_class is not None:
