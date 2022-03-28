@@ -16,7 +16,13 @@ train_request_HamS_model = model_utils.ModelTrainRequest(
         "processor_depth": 5,
         "loss_type": "entropy",
         "starting_learning_rate": 1e-4,
-        "val_dataloader_tags": ["artificial", "ER"]
+        "val_dataloader_tags": ["artificial", "ER"],
+        "starting_learning_rate": 4*1e-4,
+        "lr_scheduler_class": CosineAnnealingWarmRestarts,
+        "lr_scheduler_hyperparams": {
+            "T_0": 400,
+            "eta_min": 1e-6
+        }
     },
     trainer_hyperparams = {
         "max_epochs": 2000,
@@ -24,6 +30,7 @@ train_request_HamS_model = model_utils.ModelTrainRequest(
         "log_every_n_steps": 5,
         "check_val_every_n_epoch": 5,
         "gradient_clip_algorithm": "norm",
+        "gradient_clip_value": 1
     },
     datamodule_hyperparams = {
         "train_virtual_epoch_size": 8 * 100,
@@ -41,7 +48,8 @@ train_request_HamS_model = model_utils.ModelTrainRequest(
 )
 train_request_HamS_model.arguments["trainer_hyperparams"]["callbacks"] = [LearningRateMonitor(logging_interval="step")] \
     + [my_callbacks.create_lp_callback(target_type, p_norm) for target_type
-       in ["max_lp_logits", "max_lp_weights", "max_lp_gradients", "flat_lp_gradients"] for p_norm in [2.1, 1.2, 2, 2.2, 5, 15]]
+       in ["max_lp_logits", "max_lp_weights", "max_lp_gradients", "flat_lp_gradients"] for p_norm in [2, 5]]
+
 
 train_request_HamS_quick = copy.deepcopy(train_request_HamS_model)
 train_request_HamS_quick.arguments["trainer_hyperparams"].update({"max_epochs": 50})
@@ -90,16 +98,3 @@ train_request_HamS_cosine_annealing.arguments["model_hyperparams"]["lr_scheduler
     "T_0": 400,
     "eta_min": 1e-6,
 }
-
-_debug_large_lr = copy.deepcopy(train_request_HamS_model)
-_debug_large_lr.arguments["model_hyperparams"]["starting_learning_rate"] = 0.012
-# _debug_large_lr.arguments["trainer_hyperparams"]["track_grad_norm"] = 2
-
-_debug_with_multiple_dataloaders = copy.deepcopy(train_request_HamS_model)
-_debug_with_multiple_dataloaders.arguments["trainer_hyperparams"]["max_epochs"] = 25
-_debug_with_multiple_dataloaders.arguments["model_hyperparams"]["val_dataloader_tags"] = ["artificial", "ER"]
-_debug_with_multiple_dataloaders.arguments["datamodule_class"] = DataModules.ArtificialCycleWithDoubleEvaluationDataModule
-_debug_with_multiple_dataloaders.arguments["datamodule_hyperparams"].update({
-    "val_hamiltonian_existence_probability": 0.8,
-    "val_virtual_epoch_size": 80,
-})
