@@ -109,3 +109,9 @@ train_request_HamS_different_artificial_graphs_4.arguments["datamodule_hyperpara
 
 train_request_HamS_different_artificial_graphs_2 = copy.deepcopy(train_request_HamS_model)
 train_request_HamS_different_artificial_graphs_2.arguments["datamodule_hyperparams"]["train_expected_noise_edges_per_node"] = 2
+
+train_request_HamS_mse = copy.deepcopy(train_request_HamS_model)
+train_request_HamS_mse.arguments["model_hyperparams"]["loss_type"] = "mse"
+
+train_request_HamS_mse_large = copy.deepcopy(train_request_HamS_mse)
+train_request_HamS_mse_large.arguments["datamodule_hyperparams"].update({"train_graph_size": 200, "val_graph_size": 200})
