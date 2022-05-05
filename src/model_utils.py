@@ -114,16 +114,50 @@ def create_model_for_wandb_run(wandb_run, checkpoint_path):
         except Exception as ex:
             model = None
 
-    if model is not None:
+    if model is None:
         try:
             with tempfile.TemporaryDirectory() as tmp_dir:
-                artifact = wandb_run.use_artifact(f"model-{wandb_run.id}:v1")
+                artifact = wandb_run.use_artifact(f"model-{wandb_run.id}:v0")
                 checkpoint_path = Path(artifact.download(tmp_dir))
                 model = create_model_from_checkpoint(checkpoint_path)
         except Exception as ex:
             model = None
 
     return model
+
+def load_existing_model(model_identifier, wandb_project=constants.WEIGHTS_AND_BIASES_PROJECT, wandb_run=None):
+    checkpoint_path = Path(model_identifier)
+    model = None
+
+    if wandb_run is None:
+        _local_wandb_run = wandb.init(project=wandb_project, resume=False)
+        wandb_run = _local_wandb_run
+
+    if checkpoint_path.exists():
+        try:
+            wandb_run = wandb.init(project=wandb_project, resume=False)
+            model = create_model_from_checkpoint(checkpoint_path)
+            if model is None:
+                return None, f"Failed to create model from {checkpoint_path}. Appropriate model classes seem to be missing."
+        except Exception as ex:
+            wandb_run = None
+            model = None
+
+    if model is None or wandb_run is None:
+        try:
+            wandb_id = model_identifier
+            wandb_run = wandb.init(project=wandb_project, id=wandb_id, resume=True)
+            model = create_model_for_wandb_run(wandb_run, wandb_run.config["checkpoint"])
+            if model is None:
+                return None, "Identified wandb run but failed to create the model for it"
+        except Exception as ex:
+            wandb_run = None
+            model = None
+
+    if _local_wandb_run:
+        _local_wandb_run.finish()
+
+    return model, "OK"
 
 
 def test_on_saved_data(model: HamiltonSolver, wandb_run=None):

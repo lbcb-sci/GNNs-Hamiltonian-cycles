@@ -5,9 +5,7 @@ import torch_geometric as torch_geometric
 from typing import Iterable, List
 import random
 
-from zmq import device
-
-from ExactSolvers import ConcordeHamiltonSolver
+from src.ExactSolvers import ConcordeHamiltonSolver
 
 
 def get_shifts_for_graphs_in_batch(batch_graph: torch_geometric.data.Batch):
