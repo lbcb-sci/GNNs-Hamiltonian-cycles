@@ -323,7 +323,7 @@ class EncodeProcessDecodeAlgorithm(HamFinderGNN):
     def forward(self, d: torch_g.data.Data):
         return self.next_step_logits_masked_over_neighbors(d)
 
-    def training_step(self, graph_batch_dict):
+    def _training_step_procedure(self, graph_batch_dict):
         batch_graph, teacher_paths = self._unpack_graph_batch_dict(graph_batch_dict)
 
         class TrainingRunInstructions(self._RunInstructions):
@@ -379,13 +379,17 @@ class EncodeProcessDecodeAlgorithm(HamFinderGNN):
 
         avg_loss = run_instructions.loss / run_instructions.teacher_tensor.nelement()
         self.logits_per_step = run_instructions._logits_per_step
+        return avg_loss
+
+    def training_step(self, graph_batch_dict):
+        avg_loss = self._training_step_procedure(graph_batch_dict)
         self.log("train/loss", avg_loss)
         return avg_loss
 
     def validation_step(self, graph_batch_dict, batch_idx, dataloader_idx=0):
         dataloader_tag = self.get_validation_dataloader_tag(dataloader_idx)
         with torch.no_grad():
-            loss = self.training_step(graph_batch_dict)
+            loss = self._training_step_procedure(graph_batch_dict)
             self.log(f"{dataloader_tag}/loss", loss)
             self._compute_and_update_accuracy_metrics(graph_batch_dict, dataloader_tag)
             return loss
