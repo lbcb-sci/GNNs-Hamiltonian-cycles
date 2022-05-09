@@ -38,7 +38,7 @@ train_request_HamS = model_utils.ModelTrainRequest(
         "train_batch_size": 8,
         "val_batch_size": 8,
         "train_graph_size": 25,
-        "train_expected_noise_edges_per_node": 2,
+        "train_expected_noise_edges_per_node": 4,
         "val_hamiltonian_existence_probability": 0.8,
     },
     model_checkpoint_hyperparams = {
@@ -110,6 +110,9 @@ train_request_HamS_different_artificial_graphs_4.arguments["datamodule_hyperpara
 train_request_HamS_different_artificial_graphs_2 = copy.deepcopy(train_request_HamS)
 train_request_HamS_different_artificial_graphs_2.arguments["datamodule_hyperparams"]["train_expected_noise_edges_per_node"] = 2
 
+train_request_HamS_different_artificial_graphs_3_5 = copy.deepcopy(train_request_HamS)
+train_request_HamS_different_artificial_graphs_3_5.arguments["datamodule_hyperparams"]["train_expected_noise_edges_per_node"] = 3.5
+
 train_request_HamS_mse = copy.deepcopy(train_request_HamS)
 train_request_HamS_mse.arguments["model_hyperparams"]["loss_type"] = "mse"
 
@@ -117,4 +120,4 @@ train_request_HamS_mse_large = copy.deepcopy(train_request_HamS_mse)
 train_request_HamS_mse_large.arguments["datamodule_hyperparams"].update({"train_graph_size": 200, "val_graph_size": 200})
 
 train_request_HamS_mse_large_faster = copy.deepcopy(train_request_HamS_mse_large)
-train_request_HamS_mse_large_faster.arguments["model_hyperparams"]["starting_learning_rate"] *= 100
+train_request_HamS_mse_large_faster.arguments["model_hyperparams"]["starting_learning_rate"] *= 20
