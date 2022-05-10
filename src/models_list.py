@@ -128,3 +128,45 @@ train_request_HamS_no_hidden.arguments["model_class"] = Models._EncodeProcessDec
 
 train_request_HamS200_no_hidden = copy.deepcopy(train_request_HamS_no_hidden)
 train_request_HamS200_no_hidden.arguments["datamodule_hyperparams"]["train_graph_size"] = 200
+
+
+### Reinforcement learning models
+
+train_request_HamR = model_utils.ModelTrainRequest(
+    # is_log_offline=True,
+    # is_log_model=False,
+    model_class = Models.EmbeddingAndMaxMPNN,
+    datamodule_class = DataModules.ReinforcementErdosRenyiDataModule,
+    model_checkpoint = None,
+    model_hyperparams = {
+        "processor_depth": 5,
+        "loss_type": "entropy",
+        "starting_learning_rate": 1e-4,
+        "starting_learning_rate": 4*1e-4,
+        "lr_scheduler_class": CosineAnnealingWarmRestarts,
+        "lr_scheduler_hyperparams": {
+            "T_0": 400,
+            "eta_min": 1e-6
+        }
+    },
+    trainer_hyperparams = {
+        "max_epochs": 2000,
+        "num_sanity_val_steps": 2,
+        "log_every_n_steps": 5,
+        "check_val_every_n_epoch": 5,
+        "gradient_clip_algorithm": "norm",
+        "gradient_clip_val": 1
+    },
+    datamodule_hyperparams = {
+        "train_virtual_epoch_size": 8 * 100,
+        "val_virtual_epoch_size": 8 * 50,
+        "train_batch_size": 8,
+        "val_batch_size": 8,
+        "train_graph_size": 25,
+        "train_ham_existence_prob": 0.8,
+    },
+    model_checkpoint_hyperparams = {
+        "every_n_epochs": 1,
+        "dirpath": None,
+    }
+)

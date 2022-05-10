@@ -102,7 +102,7 @@ class ReinforcementErdosRenyiDataModule(TestWithLocalDatasetDataModule):
     def __init__(self, train_ham_existence_prob=0.8, val_ham_existence_prob=None, train_nr_simultaneous_simulations=4,
                  val_nr_simultaneous_simulations=1, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.simulation_module = self.__lightnig_module_reference
+        self.simulation_module = kwargs[LIGHTNING_MODULE_REFERENCE]
         self.train_ham_existence_prob = train_ham_existence_prob
         self.val_ham_existence_prob = val_ham_existence_prob if val_ham_existence_prob else self.train_ham_existence_prob
         self.train_nr_simultaneous_simulations = train_nr_simultaneous_simulations
