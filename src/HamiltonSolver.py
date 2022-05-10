@@ -30,7 +30,7 @@ class DataUtils:
         return neighbor_index.unique()
     @staticmethod
     def _mask_neighbor_logits(logits, d: torch_g.data.Data):
-        valid_next_step_indices = DataUtils._neighbor_indices(d)
+        valid_next_step_indices = torch.cat([DataUtils._neighbor_indices(d), DataUtils._current_indices(d)])
         neighbor_logits = torch.zeros_like(logits).log()
         neighbor_logits[valid_next_step_indices] = logits.index_select(0, valid_next_step_indices)
         return neighbor_logits
