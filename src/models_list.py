@@ -121,3 +121,10 @@ train_request_HamS_mse_large.arguments["datamodule_hyperparams"].update({"train_
 
 train_request_HamS_mse_large_faster = copy.deepcopy(train_request_HamS_mse_large)
 train_request_HamS_mse_large_faster.arguments["model_hyperparams"]["starting_learning_rate"] *= 20
+
+
+train_request_HamS_no_hidden = copy.deepcopy(train_request_HamS)
+train_request_HamS_no_hidden.arguments["model_class"] = Models._EncodeProcessDecodeNoHidden
+
+train_request_HamS200_no_hidden = copy.deepcopy(train_request_HamS_no_hidden)
+train_request_HamS200_no_hidden.arguments["datamodule_hyperparams"]["train_graph_size"] = 200

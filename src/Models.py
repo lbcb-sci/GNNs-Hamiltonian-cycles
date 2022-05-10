@@ -300,9 +300,9 @@ class EncodeProcessDecodeAlgorithm(HamFinderGNN):
         assert loss_type in ["mse", "entropy"]
         self.loss_type = loss_type
 
+        self.initial_h = torch.nn.Parameter(torch.rand(self.hidden_dim))
         self.encoder_nn, self.decoder_nn = self._construct_encoder_and_decoder()
         self.processor_nn = self._construct_processor()
-        self.initial_h = torch.nn.Parameter(torch.rand(self.hidden_dim))
 
     def description(self):
         return f"encoder: {torchinfo.summary(self.encoder_nn, verbose=0, depth=5)}\n" \
@@ -393,6 +393,23 @@ class EncodeProcessDecodeAlgorithm(HamFinderGNN):
             self.log(f"{dataloader_tag}/loss", loss)
             self._compute_and_update_accuracy_metrics(graph_batch_dict, dataloader_tag)
             return loss
+
+
+class _EncodeProcessDecodeNoHidden(EncodeProcessDecodeAlgorithm):
+    def _construct_encoder_and_decoder(self):
+        # Hack to remove self.initial_h from paramters
+        _mock_initial_h = torch.zeros_like(self.initial_h)
+        del self.initial_h
+        self.initial_h = _mock_initial_h
+
+        encoder_nn = torch.nn.Sequential(torch.nn.Linear(3, self.hidden_dim))
+        decoder_nn = torch.nn.Sequential(torch.nn.Linear(self.hidden_dim + self.hidden_dim, self.out_dim))
+        return encoder_nn, decoder_nn
+
+    def raw_next_step_logits(self, d: torch_g.data.Data):
+        d.z = self.encoder_nn(d.x.clone())
+        d.h = self.processor_nn(d.z, d.edge_index, d.edge_attr)
+        return torch.squeeze(self.decoder_nn(torch.cat([d.z, d.h], dim=-1)), dim=-1)
 
 
 class EmbeddingAndMaxMPNN(HamCycleFinderWithValueFunction):
