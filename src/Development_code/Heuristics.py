@@ -14,13 +14,13 @@ def _to_networkit(num_nodes, edge_index: torch.tensor):
     return g
 
 
-def _least_degree_first(g: networkit.Graph, start_node, is_use_unreachable_vertex_heuristics=True):
+def _least_degree_first(g: networkit.Graph, start_node, map_node_to_degree, is_use_unreachable_vertex_heuristics=True):
     g = deepcopy(g)
     current = start_node
     path = []
     for step in range(g.numberOfNodes()):
         path.append(current)
-        next_step_options = sorted([x for x in g.iterNeighbors(current)], key=g.degree)
+        next_step_options = sorted([x for x in g.iterNeighbors(current)], key = lambda x: map_node_to_degree[x])
         g.removeNode(current)
         if is_use_unreachable_vertex_heuristics:
             better_options = [x for x in next_step_options
@@ -37,19 +37,24 @@ def _least_degree_first(g: networkit.Graph, start_node, is_use_unreachable_verte
 
 def least_degree_first_heuristics(num_nodes, edge_index: torch.tensor, is_use_unreachable_vertex_heuristics=True):
     g = _to_networkit(num_nodes, edge_index)
+    map_node_to_degree = {x: g.degree(x) for x in g.iterNodes()}
     max_degree = networkit.graphtools.maxDegree(g)
-    start_node = [x for x in g.iterNodes() if g.degree(x) == max_degree][0]
-    path = _least_degree_first(g, start_node, is_use_unreachable_vertex_heuristics)
+    start_nodes = [x for x in g.iterNodes() if g.degree(x) == max_degree]
+    path = []
+    for start in start_nodes:
+        proposed_path = _least_degree_first(g, start, map_node_to_degree, is_use_unreachable_vertex_heuristics)
+        if len(proposed_path) > len(path):
+            path = proposed_path
     if len(path) == num_nodes and g.hasEdge(path[0], path[-1]):
-        path.append(start_node)
+        path.append(path[0])
     return path
 
 
 def _rotational_options(g, path):
     end = path[-1]
-    rotational_options = []
+    rotational_options = [path, _invert_path(path)]
     for i in range(len(path) - 2):
-        if g.hasEdge(path[i], end) and [y for y in g.iterNeighbors(path[i + 1]) if y not in path]:
+        if g.hasEdge(path[i], end):
             rotational_options.append(path[:i + 1] + [path[j] for j in range(len(path) - 1, i, -1)])
     return rotational_options
 
@@ -61,36 +66,38 @@ class LeastDegreeFirstHeuristics(HamiltonSolver):
     def solve_graphs(self, graphs):
         return [least_degree_first_heuristics(graph.num_nodes, graph.edge_index, True) for graph in graphs]
 
+
+def _path_nr_extendable_nodes(graph, p):
+    return len([x for x in graph.iterNeighbors(p[-1]) if x not in p]) > 0
+
+
 class HybridHam(HamiltonSolver):
     def solve_graphs(self, graphs):
         return [self._solve(graph.num_nodes, graph.edge_index) for graph in graphs]
 
     def _solve(self, num_nodes, edge_index: torch.tensor):
         g = _to_networkit(num_nodes, edge_index)
-        max_degree = networkit.graphtools.maxDegree(g)
-        start_options = [x for x in g.iterNodes() if g.degree(x) == max_degree]
-        initial_paths = []
-        for start_node in start_options:
-            initial_paths.append(_least_degree_first(g, start_node, True))
-        path = max(initial_paths, key=len)
+        map_node_to_degree = {x: g.degree(x) for x in g.iterNodes()}
 
+        path = least_degree_first_heuristics(num_nodes, edge_index, is_use_unreachable_vertex_heuristics=True)
         if len(path) <= 2:
             return path
 
         while len(path) < num_nodes:
-            if g.degree(path[0]) > g.degree(path[-1]):
+            if map_node_to_degree[path[0]] > map_node_to_degree[path[-1]]:
                 path = _invert_path(path)
             rotational_options = _rotational_options(g, path)
-            if rotational_options:
-                reduced_graph = deepcopy(g)
-                for edge in g.iterEdges():
-                    if edge[0] in path or edge[1] in path:
-                        reduced_graph.removeEdge(*edge)
-                extension_options = [p for p in rotational_options if reduced_graph.degree(p[-1]) > 0]
+            if len(rotational_options) > 0:
+                extension_options = [p for p in rotational_options if _path_nr_extendable_nodes(g, p) > 0]
                 if not extension_options:
                     return path
-                path = max(extension_options, key=lambda p: reduced_graph.degree(p[-1]))
-                path = path + _least_degree_first(reduced_graph, path[-1])
+                path = min(extension_options, key=lambda p: _path_nr_extendable_nodes(g, p))
+                reduced_graph = deepcopy(g)
+                for edge in g.iterEdges():
+                    if edge[0] in path[:-1] or edge[1] in path[:-1]:
+                        reduced_graph.removeEdge(*edge)
+                extension = _least_degree_first(reduced_graph, path[-1], map_node_to_degree, is_use_unreachable_vertex_heuristics=True)
+                path = path[:-1] + extension
             else:
                 return path
 
@@ -98,13 +105,13 @@ class HybridHam(HamiltonSolver):
             path.append(path[0])
             return path
 
-        if g.degree(path[0]) < g.degree(path[-1]):
+        if map_node_to_degree[path[0]] < map_node_to_degree[path[-1]]:
             path = _invert_path(path)
 
         rotational_options = _rotational_options(g, path)
         for option in rotational_options:
             if g.hasEdge(option[0], option[-1]):
-                option = option.append(option[0])
+                option.append(option[0])
                 return option
         return path
 
@@ -139,8 +146,14 @@ if __name__ == '__main__':
     path = Path(__file__).parent.parent.parent / "HCP_benchmarks/graph2.hcp"
     num_nodes, edge_index = load_graph_from_hcp_file(path)
     graph = torch_geometric.data.Data(num_nodes=num_nodes, edge_index=edge_index)
-    solution = least_degree_first_heuristics(num_nodes, edge_index)
-    print(solution)
+    # solution = HybridHam()._solve(num_nodes, edge_index)
+    # solution = least_degree_first_heuristics(num_nodes, edge_index, is_use_unreachable_vertex_heuristics=True)
+    # print(solution)
+
+    m = HybridHam()
+    import src.Evaluation as eval
+    evals = eval.EvaluationScores.evaluate_model_on_saved_data(m, 10000)
+    acc = eval.EvaluationScores.compute_accuracy_scores(evals)
 
 
     num_nodes = 100
