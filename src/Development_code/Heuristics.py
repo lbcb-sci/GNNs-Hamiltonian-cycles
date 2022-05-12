@@ -1,3 +1,4 @@
+from pathlib import Path
 import networkit
 import networkx as nx
 import torch
@@ -107,13 +108,39 @@ class HybridHam(HamiltonSolver):
         return path
 
 
+def load_graph_from_hcp_file(hcp_path):
+    lines = Path(hcp_path).read_text().split("\n")
+    _dim_line = next(l for l in lines if l.startswith("DIMENSION"))
+    num_nodes = int(_dim_line.split()[-1])
+    edges_start, edges_end = None, None
+    for i in range(len(lines)):
+        if lines[i].startswith("EDGE_DATA_SECTION"):
+            edges_start = i + 1
+        if lines[i].startswith("-1"):
+            edges_end = i
+    edges_lines = lines[edges_start: edges_end]
+    edge_index = torch.tensor([[int(node) for node in l.split()] for l in edges_lines]).t()
+    # .hcp start indexing nodes for 1 insetad of 0
+    edge_index -= 1
+    edge_index = torch.cat([edge_index, edge_index.flip(0)], dim=-1)
+    return num_nodes, edge_index
+
+
 if __name__ == '__main__':
-    from src.GraphGenerators import ErdosRenyiGenerator
+    from src.data.GraphGenerators import ErdosRenyiGenerator
     import itertools
     import torch_geometric
     import networkx
     from matplotlib import pyplot as plt
     from copy import deepcopy
+
+    from pathlib import Path
+    path = Path(__file__).parent.parent.parent / "HCP_benchmarks/graph2.hcp"
+    num_nodes, edge_index = load_graph_from_hcp_file(path)
+    graph = torch_geometric.data.Data(num_nodes=num_nodes, edge_index=edge_index)
+    solution = HybridHam().solve(graph)
+    print(solution)
+
 
     num_nodes = 100
     generator = ErdosRenyiGenerator(num_nodes, 0.4)
@@ -121,7 +148,7 @@ if __name__ == '__main__':
     for d in itertools.islice(generator, 100):
         path = least_degree_first_heuristics(num_nodes, d.edge_index, False)
         path_improved = least_degree_first_heuristics(num_nodes, d.edge_index, True)
-        HybridHam_path = HybridHam(num_nodes, d.edge_index)
+        HybridHam_path = HybridHam().solve(d)
         print(len(HybridHam_path), len(path_improved))
         if len(HybridHam_path) == num_nodes + 1:
             nx_graph = torch_geometric.utils.to_networkx(d)
