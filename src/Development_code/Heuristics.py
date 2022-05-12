@@ -8,8 +8,9 @@ from src.Models import HamiltonSolver
 
 def _to_networkit(num_nodes, edge_index: torch.tensor):
     g = networkit.Graph(num_nodes)
-    for edge in edge_index.t()[::2]:
-        g.addEdge(*edge)
+    for edge in edge_index.t():
+        if not g.hasEdge(*edge):
+            g.addEdge(*edge)
     return g
 
 
@@ -138,7 +139,7 @@ if __name__ == '__main__':
     path = Path(__file__).parent.parent.parent / "HCP_benchmarks/graph2.hcp"
     num_nodes, edge_index = load_graph_from_hcp_file(path)
     graph = torch_geometric.data.Data(num_nodes=num_nodes, edge_index=edge_index)
-    solution = HybridHam().solve(graph)
+    solution = least_degree_first_heuristics(num_nodes, edge_index)
     print(solution)
 
 
