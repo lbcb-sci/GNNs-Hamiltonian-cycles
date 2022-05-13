@@ -17,12 +17,15 @@ if __name__ == "__main__":
     checkpoint_path = Path(identifier)
     if checkpoint_path.exists():
         try:
-            wandb_run = wandb.init(project=wandb_project, resume=False)
             model = model_utils.create_model_from_checkpoint(checkpoint_path)
             if model is None:
                 print(f"Failed to create model from {checkpoint_path}. Appropriate model classes seem to be missing.")
+            else:
+                wandb_run = wandb.init(project=wandb_project, resume=False, name=f"{checkpoint_path.name}")
 
         except Exception as ex:
+            if wandb_run is not None:
+                wandb_run.finish()
             wandb_run = None
             model = None
 
@@ -34,13 +37,16 @@ if __name__ == "__main__":
             if model is None:
                 print("Identified wandb run but failed to create the model for it")
         except Exception as ex:
+            if wandb_run is not None:
+                wandb_run.finish()
             wandb_run = None
             model = None
 
 
     if wandb_run is None:
         print(f"Could not identify model through '{identifier}'")
+        exit(-2)
     else:
         results = model_utils.test_on_saved_data(model, wandb_run=wandb_run)
-        wandb_run.finish()
         print(results)
+        wandb_run.finish()
