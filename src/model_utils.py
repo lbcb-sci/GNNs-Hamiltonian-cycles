@@ -94,6 +94,10 @@ def train_model(model_class, datamodule_class, model_checkpoint=None, model_hype
             raise train_exception
 
 
+def reconnect_to_wandb_run(wandb_run_id):
+    return wandb.init(id=wandb_run_id, project=constants.WEIGHTS_AND_BIASES_PROJECT, resume=True)
+
+
 def create_model_from_checkpoint(checkpoint_path):
     model_classes = [var for var_name, var in vars(models).items() if isclass(var) and issubclass(var, models.HamFinderGNN)]
     model = None
@@ -105,7 +109,7 @@ def create_model_from_checkpoint(checkpoint_path):
     return model
 
 
-def create_model_for_wandb_run(wandb_run, checkpoint_path):
+def create_model_for_wandb_run(wandb_run, checkpoint_path=None):
     model = None
     if "checkpoint" in wandb_run.config:
         try:
