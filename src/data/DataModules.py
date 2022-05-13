@@ -77,6 +77,7 @@ class ArtificialCycleWithDoubleEvaluationDataModule(ArtificialCycleDataModule):
         dataloader_like_test = GraphDataLoader(FilterSolvableGraphsGeneratingDataset(generator_like_test, self.val_virtual_epoch_size), batch_size=self.val_batch_size)
         return dataloader_like_train, dataloader_like_test
 
+
 class SolvedErdosRenyiDataModule(TestWithLocalDatasetDataModule):
     def __init__(self, train_hamilton_existence_probability, val_hamilton_existence_probability=None, *args, **kwargs):
         self.train_hamilton_existence_probability = train_hamilton_existence_probability

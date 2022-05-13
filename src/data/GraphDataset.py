@@ -1,9 +1,10 @@
 from collections import deque
+from typing import Iterable, List
+import random
+
 import torch
 import torch.nn.functional as F
 import torch_geometric as torch_geometric
-from typing import Iterable, List
-import random
 
 from src.ExactSolvers import ConcordeHamiltonSolver
 
@@ -21,6 +22,7 @@ class GraphExample:
         self.graph = graph
         self.teacher_path = teacher_path
         self.teacher_distribution = teacher_distribution
+
 
 class GraphBatchExample:
     def __init__(self, graph_batch: torch_geometric.data.Batch, teacher_paths: List[torch.Tensor], teacher_distributions: torch.Tensor=None) -> None:
@@ -48,12 +50,14 @@ class GraphBatchExample:
             "teacher_paths": self.teacher_paths,
         }
 
+
 class SimulationState:
     def __init__(self, graph_state: torch_geometric.data.Data, action: int, reward: int, simulation_depth: int) -> None:
         self.graph_state = graph_state
         self.action = action
         self.reward = reward
         self.simulation_depth = simulation_depth
+
 
 class BatchedSimulationStates:
     def __init__(self, batch_graph, actions, rewards, simulation_depths) -> None:
@@ -180,6 +184,7 @@ class SimulationsDataset(torch.utils.data.DataLoader):
         self.simulations_storage.extend(simulation_data)
         self.simulations_count += 1
         return self.simulations_storage.pop()
+
 
 class SimulationStatesDataLoader(torch.utils.data.DataLoader):
     @staticmethod
