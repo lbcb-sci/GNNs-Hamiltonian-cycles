@@ -16,7 +16,7 @@ if __name__ == "__main__":
         target_name = args[-2]
         run_name = args[-1]
     else:
-        target_name = "train_request_HamS_larger_graphs"
+        target_name = None
 
     if target_name in possible_targets:
         getattr(models_list, target_name).train(nr_cpu_threads=1, run_name=run_name)
