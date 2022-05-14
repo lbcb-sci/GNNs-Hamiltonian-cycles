@@ -7,6 +7,7 @@ from typing import List
 import copy
 import time
 import threading
+import warnings
 
 import torch
 import torch_geometric as torch_g
@@ -70,7 +71,12 @@ class ConcordeHamiltonSolver(HamiltonSolver):
             out_stream.decode("utf-8") for out_stream in [called_process.stdout, called_process.stderr]]
 
         optimal_len_regex = re.search(r"Optimal Solution: ([0-9.]+)", string_stdout)
-        optimal_len = round(float(optimal_len_regex.group(0).split(":")[1].strip()))
+        if optimal_len_regex is None:
+            warnings.warn("Concorde printout tends to have problem with certain small graphs like a triangle graph. Checked it by hand and it really"
+                          " seems to be a bug. Ignoring and reading the solution as if everything were normal.")
+            optimal_len = d.num_nodes
+        else:
+            optimal_len = round(float(optimal_len_regex.group(0).split(":")[1].strip()))
 
         user_time_regex = re.search(r"([0-9.]+)user", string_stderr)
         real_time_regex = re.search(r"([0-9.]+):([0-9.]+)elapsed", string_stderr)
