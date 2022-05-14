@@ -5,10 +5,9 @@ import wandb
 
 from OlcGraph import OlcGraph
 
-import src.constants as constants
-from src.ExactSolvers import ConcordeHamiltonSolver
-from src.HamiltonSolver import HamiltonSolver
 import src.model_utils as model_utils
+from src.HamiltonSolver import HamiltonSolver
+import src.constants as constants
 from src.Evaluation import EvaluationScores
 
 def test_on_genomic_graphs(model: HamiltonSolver, graph_paths: list[Path]):
@@ -44,37 +43,20 @@ def compute_genomics_statistic(eval: dict):
 
 
 def test_on_genomic_dataset(model: HamiltonSolver, dataset_summary_file=None):
-    dataset_summary_file = Path(__file__).parent.parent / "genome_graphs/SnakemakePipeline/analysis_genome_dataset.txt"
     graph_paths = [Path(p) for p in dataset_summary_file.read_text().split("\n") if p.endswith(".gml")]
     eval = test_on_genomic_graphs(model, graph_paths)
     stats = compute_genomics_statistic(eval)
     return stats, eval
 
-def test_wandb_model_on_genomic_data(wandb_id: str, model:HamiltonSolver=None, dataset_summary_file=None, wandb_project=constants.WEIGHTS_AND_BIASES_PROJECT):
+def test_wandb_model_on_genomic_data(wandb_id: str, model:HamiltonSolver=None, dataset_summary_file=None, log_prefix="string_graphs", wandb_project=constants.WEIGHTS_AND_BIASES_PROJECT):
     stats, eval = None, None
     try:
         wandb_run = wandb.init(project=wandb_project, id=wandb_id, resume=True)
         if model is None:
             model = model_utils.create_model_for_wandb_run(wandb_run)
         stats, eval = test_on_genomic_dataset(model, dataset_summary_file)
-        wandb_run.log({f"string_graphs/{key}": value for key, value in stats.items()})
+        wandb_run.log({f"{log_prefix}/{key}": value for key, value in stats.items()})
     finally:
         if wandb_run is not None:
             wandb_run.finish()
     return stats, eval
-
-
-if __name__ == "__main__":
-    from src.Development_code.Heuristics import HybridHam
-    concorde_solver = ConcordeHamiltonSolver()
-    hybrid_ham = HybridHam()
-
-    run_id = "s9ket5ka"
-
-    wandb_run = model_utils.reconnect_to_wandb_run(run_id)
-    hams = model_utils.create_model_for_wandb_run(wandb_run)
-    wandb_run.finish()
-
-    stats, eval = test_wandb_model_on_genomic_data(run_id, hams)
-    for key, value in stats.items():
-        print(f"{key}", value)
