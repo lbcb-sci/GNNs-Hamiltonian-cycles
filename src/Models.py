@@ -104,7 +104,7 @@ class HamFinderGNN(HamiltonSolver, torch_lightning.LightningModule):
         def choose_next_step_fn(self, batch_graph, current_nodes, step_number, is_algorithm_stopped_mask):
             pass
 
-        def update_algorithm_stopped_mask(self, all_previous_choices, current_choice, is_algorithm_stopped_mask):
+        def update_algorithm_stopped_mask(self, all_previous_choices, current_choice, is_algorithm_stopped_mask, step_number):
             if len(all_previous_choices) > 0:
                 already_visited_mask = torch.any(
                     torch.stack([torch.eq(x, current_choice) for x in all_previous_choices], -1), -1)
@@ -132,7 +132,7 @@ class HamFinderGNN(HamiltonSolver, torch_lightning.LightningModule):
             next_step_choices = torch.logical_not(is_algorithm_stopped_mask) * next_step_choices - is_algorithm_stopped_mask * torch.ones_like(next_step_choices)
             current_nodes = next_step_choices
 
-            is_algorithm_stopped_mask = run_instructions.update_algorithm_stopped_mask(all_choices, current_nodes, is_algorithm_stopped_mask)
+            is_algorithm_stopped_mask = run_instructions.update_algorithm_stopped_mask(all_choices, current_nodes, is_algorithm_stopped_mask, step_number)
             all_choices.append(next_step_choices)
 
             if torch.all(is_algorithm_stopped_mask).item():
@@ -371,8 +371,12 @@ class EncodeProcessDecodeAlgorithm(HamFinderGNN):
                 self.loss += self.compute_loss(logits, probabilites, step_number, is_algorithm_stopped_mask)
                 return self.teacher_tensor[:, step_number]
 
-            def update_algorithm_stopped_mask(self, all_previous_choices, current_choice, is_algorithm_stopped_mask):
-                return is_algorithm_stopped_mask # No need for update, because of teacher forcing all batch algortithms will run util the end.
+            def update_algorithm_stopped_mask(self, all_previous_choices, current_choice, is_algorithm_stopped_mask, step_number):
+                # Quickfix to stop training if batch dim is 1 and teacher path is shorter than graph length.
+                if step_number == self.teacher_tensor.shape[-1] - 1:
+                    return torch.full_like(is_algorithm_stopped_mask, True)
+                else:
+                    return is_algorithm_stopped_mask
 
         run_instructions = TrainingRunInstructions(self, graph_batch_dict)
         self._run_on_graph_batch(batch_graph, run_instructions)
