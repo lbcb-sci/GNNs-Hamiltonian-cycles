@@ -1,10 +1,12 @@
 import copy
+from pathlib import Path
 
 from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts
 from pytorch_lightning.callbacks import LearningRateMonitor, ModelCheckpoint
 
 import src.Models as Models
 import src.data.DataModules as DataModules
+import src.data.genomic_datasets as genomic_datasets
 import src.model_utils as model_utils
 import src.callbacks as my_callbacks
 
@@ -128,6 +130,25 @@ train_request_HamS_no_hidden.arguments["model_class"] = Models._EncodeProcessDec
 
 train_request_HamS200_no_hidden = copy.deepcopy(train_request_HamS_no_hidden)
 train_request_HamS200_no_hidden.arguments["datamodule_hyperparams"]["train_graph_size"] = 200
+
+
+data_root_folder = (Path(__file__).parent / "../genome_graphs/SnakemakePipeline").resolve()
+train_request_HamS_genomes = copy.deepcopy(train_request_HamS)
+train_request_HamS_genomes.arguments["model_hyperparams"].update({
+    "val_dataloader_tags": ["val"]
+})
+train_request_HamS_genomes.arguments["datamodule_class"] = genomic_datasets.StringGraphDatamodule
+train_request_HamS_genomes.arguments["datamodule_hyperparams"] = {
+    "train_batch_size": 1,
+    "val_batch_size": 1,
+    "train_paths": (data_root_folder / "string_graphs_train.txt").read_text().split(),
+    "val_paths": (data_root_folder / "string_graphs_val.txt").read_text().split(),
+    "test_paths": (data_root_folder / "string_graphs_test.txt").read_text().split()
+}
+train_request_HamS_genomes.arguments["trainer_hyperparams"]["callbacks"] = lr_callbacks + norm_monitoring_callbacks + [ModelCheckpoint(save_top_k=3, save_last=True, monitor="val/ER/hamiltonian_cycle")]
+
+train_request_HamS_genomes_lr = copy.deepcopy(train_request_HamS_genomes)
+train_request_HamS_genomes_lr.arguments["model_hyperparams"]["starting_learning_rate"] = 1e-6
 
 
 ### Reinforcement learning models
