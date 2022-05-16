@@ -135,7 +135,8 @@ train_request_HamS200_no_hidden.arguments["datamodule_hyperparams"]["train_graph
 data_root_folder = (Path(__file__).parent / "../genome_graphs/SnakemakePipeline").resolve()
 train_request_HamS_genomes = copy.deepcopy(train_request_HamS)
 train_request_HamS_genomes.arguments["model_hyperparams"].update({
-    "val_dataloader_tags": ["val"]
+    "val_dataloader_tags": None,
+    "loss_type": "mse"
 })
 train_request_HamS_genomes.arguments["datamodule_class"] = genomic_datasets.StringGraphDatamodule
 train_request_HamS_genomes.arguments["datamodule_hyperparams"] = {
@@ -145,11 +146,35 @@ train_request_HamS_genomes.arguments["datamodule_hyperparams"] = {
     "val_paths": (data_root_folder / "string_graphs_val.txt").read_text().split(),
     "test_paths": (data_root_folder / "string_graphs_test.txt").read_text().split()
 }
-train_request_HamS_genomes.arguments["trainer_hyperparams"]["callbacks"] = lr_callbacks + norm_monitoring_callbacks + [ModelCheckpoint(save_top_k=3, save_last=True, monitor="val/ER/hamiltonian_cycle")]
+train_request_HamS_genomes.arguments["trainer_hyperparams"]["callbacks"] = lr_callbacks + norm_monitoring_callbacks + [ModelCheckpoint(save_top_k=3, save_last=True, monitor="val/hamiltonian_cycle")]
 
 train_request_HamS_genomes_lr = copy.deepcopy(train_request_HamS_genomes)
-train_request_HamS_genomes_lr.arguments["model_hyperparams"]["starting_learning_rate"] = 1e-6
+train_request_HamS_genomes_lr.arguments["model_hyperparams"]["starting_learning_rate"] = 1e-7
 
+
+train_request_HamS_rare_artificial_cycle = copy.deepcopy(train_request_HamS)
+train_request_HamS_rare_artificial_cycle.arguments["datamodule_class"] = DataModules.ArtificialCycleDataModule
+train_request_HamS_rare_artificial_cycle.arguments["datamodule_hyperparams"] = {
+    "train_virtual_epoch_size": 8 * 100,
+    "val_virtual_epoch_size": 8 * 100,
+    "train_batch_size": 8,
+    "val_batch_size": 8,
+    "train_graph_size": 50,
+    "val_graph_size": 50,
+    "train_expected_noise_edges_per_node": 1.3,
+    "val_expected_noise_edges_per_node": 1.3
+}
+train_request_HamS_rare_artificial_cycle.arguments["trainer_hyperparams"]["max_epochs"] = 200
+_rare_artificial_checkpoint_callbacks = [ModelCheckpoint(save_top_k=3, save_last=True, monitor="val/artificial/hamiltonian_cycle")]
+train_request_HamS_rare_artificial_cycle.arguments["trainer_hyperparams"]["callbacks"] = lr_callbacks + norm_monitoring_callbacks + _rare_artificial_checkpoint_callbacks
+
+
+train_request_HamS_rare_small = copy.deepcopy(train_request_HamS_rare_artificial_cycle)
+train_request_HamS_rare_small.arguments["datamodule_hyperparams"].update({
+    "train_graph_size": 25,
+    "val_graph_size": 25,
+})
+train_request_HamS_rare_small.arguments["trainer_hyperparams"].update({"max_epochs": 500})
 
 ### Reinforcement learning models
 
@@ -162,7 +187,6 @@ train_request_HamR = model_utils.ModelTrainRequest(
     model_hyperparams = {
         "processor_depth": 5,
         "loss_type": "entropy",
-        "starting_learning_rate": 1e-4,
         "starting_learning_rate": 4*1e-4,
         "lr_scheduler_class": CosineAnnealingWarmRestarts,
         "lr_scheduler_hyperparams": {
