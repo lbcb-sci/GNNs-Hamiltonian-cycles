@@ -166,7 +166,8 @@ def test_on_saved_data(model: HamiltonSolver, wandb_run=None):
     if wandb_run is not None:
         for row_index, row in df_testing_results.iterrows():
             for accuracy_tag in [EvaluationScores.ACCURACY_SCORE_TAGS.perc_hamilton_found, EvaluationScores.ACCURACY_SCORE_TAGS.perc_long_cycles_found,
-                                EvaluationScores.ACCURACY_SCORE_TAGS.perc_full_walks_found, EvaluationScores.ACCURACY_SCORE_TAGS.perc_long_walks_found]:
+                                EvaluationScores.ACCURACY_SCORE_TAGS.perc_full_walks_found, EvaluationScores.ACCURACY_SCORE_TAGS.perc_long_walks_found,
+                                EvaluationScores.ACCURACY_SCORE_TAGS.avg_execution_time]:
                 wandb_run.log({f"{unified_test_tag}/graph_size": row["graph size"], f"{unified_test_tag}/{accuracy_tag}": row[accuracy_tag]})
     return df_testing_results
 

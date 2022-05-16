@@ -88,7 +88,6 @@ class HamFinderGNN(HamiltonSolver, torch_lightning.LightningModule):
         graph_sizes = [g.num_nodes for g in d.to_data_list()]
         max_size = max(graph_sizes)
         p = torch.stack([F.pad(x, (0, max_size - x.shape[0]), "constant", -1) for x in torch.split(p, graph_sizes)])
-
         choice = torch.argmax(
             torch.isclose(p, torch.max(p, dim=-1)[0][..., None])
             * (p + torch.randperm(p.shape[-1], device=p.device)[None, ...]), dim=-1)

@@ -19,6 +19,7 @@ class EvaluationScores:
         perc_long_cycles_found = "perc_long_cycles_found"
         perc_full_walks_found = "perc_full_walks_found"
         perc_long_walks_found = "perc_long_walks_found"
+        avg_execution_time = "avg_execution_time"
 
 
     APPROXIMATE_HAMILTON_LOWER_BOUND = 0.9
@@ -49,9 +50,11 @@ class EvaluationScores:
         return {"is_cycle": is_cycle, "is_valid": is_valid, "length": nr_unique_nodes, "size": sizes}
 
     @staticmethod
-    def solve_and_evaluate(solve_graphs, graphs: List[torch_g.data.Data]):
-        solutions = solve_graphs(g for g in graphs)
-        return EvaluationScores.evaluate(graphs, solutions)
+    def solve_time_and_evaluate(timed_solve_graphs, graphs: List[torch_g.data.Data]):
+        solutions, times = timed_solve_graphs(g for g in graphs)
+        evals = EvaluationScores.evaluate(graphs, solutions)
+        evals["time"] = times
+        return evals
 
     @staticmethod
     def compute_scores(evals):
@@ -68,13 +71,14 @@ class EvaluationScores:
     def compute_accuracy_scores(evals):
         df = EvaluationScores.compute_scores(evals)
 
-        measurement_columns = ["is_ham_cycle", "is_ham_path", "is_approx_ham_cycle", "is_approx_ham_path"]
+        measurement_columns = ["is_ham_cycle", "is_ham_path", "is_approx_ham_cycle", "is_approx_ham_path", "time"]
         scores = df[["size"] + measurement_columns].groupby("size").aggregate({name: "mean" for name in measurement_columns}).reset_index()
         _columns_rename_dict = {
             "is_ham_cycle": EvaluationScores.ACCURACY_SCORE_TAGS.perc_hamilton_found,
             "is_ham_path": EvaluationScores.ACCURACY_SCORE_TAGS.perc_full_walks_found,
             "is_approx_ham_cycle": EvaluationScores.ACCURACY_SCORE_TAGS.perc_long_cycles_found,
             "is_approx_ham_path": EvaluationScores.ACCURACY_SCORE_TAGS.perc_long_walks_found,
+            "time": EvaluationScores.ACCURACY_SCORE_TAGS.avg_execution_time
         }
         return scores.rename(columns=_columns_rename_dict)
 
@@ -105,14 +109,14 @@ class EvaluationScores:
         is_hamiltonian = numpy.array([x[1] is not None and len(x[1]) > 0 for x in _get_generator()])
 
         graph_list = [graph for graph, ham_cycle in _get_generator()]
-        evals = EvaluationScores.solve_and_evaluate(compute_walks_from_graph_list_fn, graph_list)
+        evals = EvaluationScores.solve_time_and_evaluate(compute_walks_from_graph_list_fn, graph_list)
         evals["is_graph_hamiltonian"] = is_hamiltonian
         return evals
 
     @staticmethod
     def evaluate_model_on_saved_data(nn_hamilton: HamiltonSolver, nr_graphs_per_size=10, data_folders=None):
         def _compute_walks_from_graph_list_fn(graph_list):
-            return nn_hamilton.solve_graphs(graph_list)
+            return nn_hamilton.timed_solve_graphs(graph_list)
 
         return EvaluationScores.evaluate_on_saved_data(_compute_walks_from_graph_list_fn, nr_graphs_per_size, data_folders)
 

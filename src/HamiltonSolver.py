@@ -1,6 +1,7 @@
 import torch
 import torch_geometric as torch_g
 from abc import ABC, abstractmethod
+import time
 
 
 class HamiltonSolver(ABC):
@@ -10,6 +11,17 @@ class HamiltonSolver(ABC):
 
     def solve(self, graph: torch_g.data.Data):
         return self.solve_graphs([graph])[0]
+
+    def timed_solve_graphs(self, graphs: list[torch_g.data.Data]) -> list[list[int]]:
+        times = []
+        solutions = []
+        for g in graphs:
+            start = time.thread_time_ns()
+            solution = self.solve(g)
+            end = time.thread_time_ns()
+            solutions.append(solution)
+            times.append((end - start) / 1000_000_000)
+        return solutions, times
 
 
 class DataUtils:

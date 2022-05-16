@@ -130,3 +130,6 @@ class ConcordeHamiltonSolver(HamiltonSolver):
 
     def solve_graphs(self, graphs: List[torch_g.data.Data]):
         return [self.solve(graph) for graph in graphs]
+
+    def timeed_solve_graphs(self, graphs: List[torch_g.data.Data]):
+        return zip([self.time_execution(g) for g in graphs])

@@ -13,8 +13,9 @@ from src.Evaluation import EvaluationScores
 def test_on_genomic_graphs(model: HamiltonSolver, graph_paths: list[Path]):
     assert all([path.name.endswith(".gml") for path in graph_paths])
     graphs = [OlcGraph.from_gml(path) for path in graph_paths]
-    solutions = model.solve_graphs(graphs)
+    solutions, times = model.timed_solve_graphs(graphs)
     eval = EvaluationScores.evaluate(graphs, solutions)
+    eval["time"] = times
 
     eval["graph_size"] = [graph.num_nodes for graph in graphs]
     eval["nr_incorrect_edges"] = []
@@ -38,7 +39,8 @@ def compute_genomics_statistic(eval: dict):
         "perc_ham_cycles": (df["is_cycle"] & (df["graph_size"] == df["length"])).mean(),
         "cycles_graph_coverage": df[df["is_cycle"]]["coverage"].mean(),
         "perc_incorrect": (df["nr_incorrect_edges"] > 0).mean(),
-        "avg_incorrect_edges": df["nr_incorrect_edges"].mean()
+        "avg_incorrect_edges": df["nr_incorrect_edges"].mean(),
+        "avg_execution_time": df["time"].mean()
     }
 
 
