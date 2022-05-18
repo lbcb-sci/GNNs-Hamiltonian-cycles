@@ -21,14 +21,16 @@ if __name__ == "__main__":
     concorde_run_id = "ppkzdrb3"
     hams_run_id = "s9ket5ka"
 
-    run_id = concorde_run_id
+    hams_small_aritficial_id = "1mgxabgk"
 
-    # wandb_run = model_utils.reconnect_to_wandb_run(run_id)
-    # hams = model_utils.create_model_for_wandb_run(wandb_run)
-    # wandb_run.finish()
+    run_id = "2rb1c2ym"
+    # model = concorde
 
-    model = concorde_solver
+    wandb_run = model_utils.reconnect_to_wandb_run(run_id)
+    model = model_utils.create_model_for_wandb_run(wandb_run)
+    wandb_run.finish()
 
-    stats, eval = test_wandb_model_on_genomic_data(run_id, model, dataset_summary_file=full_dataset, log_prefix="all_string_graphs")
+
+    stats, eval = test_wandb_model_on_genomic_data(run_id, model, dataset_summary_file=clean_dataset, log_prefix="all_string_graphs")
     for key, value in stats.items():
         print(f"{key}", value)
