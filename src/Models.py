@@ -204,6 +204,9 @@ class HamFinderGNN(HamiltonSolver, torch_lightning.LightningModule):
             subgraph_sizes = [g.num_nodes for g in list_of_graphs]
             batch_graph = torch_g.data.Batch.from_data_list(list_of_graphs)
             walks.extend(self.solve_batch_graph(batch_graph, subgraph_sizes))
+        for walk in walks:
+            if len(walk) > 1 and walk[-1] == walk[-2]:
+                walk.pop(-1)
         return walks
 
     def update_accuracy_metrics(self, accuracy_metrics_tag: str, graphs: list[torch_g.data.Data], solutions: list[list[int]]):
