@@ -176,6 +176,12 @@ train_request_HamS_rare_small.arguments["datamodule_hyperparams"].update({
 })
 train_request_HamS_rare_small.arguments["trainer_hyperparams"].update({"max_epochs": 500})
 
+train_request_HamS_rare_really_small = copy.deepcopy(train_request_HamS_rare_small)
+train_request_HamS_rare_really_small.arguments["datamodule_hyperparams"].update({
+    "train_expected_noise_edges_per_node": 0.07,
+    "val_expected_noise_edges_per_node": 0.07
+})
+
 ### Reinforcement learning models
 
 train_request_HamR = model_utils.ModelTrainRequest(
