@@ -9,6 +9,7 @@ if __name__ == "__main__":
     args = sys.argv
     if len(args) != 2:
         print("Please provide a checkpoint or weights and biases id of the model")
+        exit(-31)
     identifier = args[-1]
     wandb_project = constants.WEIGHTS_AND_BIASES_PROJECT
 
