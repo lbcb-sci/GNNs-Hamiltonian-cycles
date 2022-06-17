@@ -1,9 +1,12 @@
+import torch
+
 from src.data.InMemoryDataset import ErdosRenyiInMemoryDataset
 from src.constants import EVALUATION_DATA_FOLDERS, DEFAULT_DATASET_SIZES, DEFAULT_EXAMPLES_PER_SIZE_IN_DATASET,\
     HAMILTONIAN_PROBABILITY
 
 
 if __name__ == '__main__':
+    torch.set_num_threads(1)
     assert len(EVALUATION_DATA_FOLDERS)
     data_folder = EVALUATION_DATA_FOLDERS[0]
     sizes = DEFAULT_DATASET_SIZES
