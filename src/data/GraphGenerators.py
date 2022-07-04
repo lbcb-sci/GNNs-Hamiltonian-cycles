@@ -24,19 +24,13 @@ def _generate_ERmk_model_edge_index_for_small_k(num_nodes, num_edges):
     edge_index = numpy.empty([0, 2], dtype=original_dtype)
     num_edges_including_symmetric_ones = 2*num_edges
     while edge_index.shape[0] < num_edges_including_symmetric_ones:
-        points_to_generate = 2 * (num_edges + int(num_edges * _generation_overhead))
-        generated_edges = numpy.random.randint(0, num_nodes, size=[points_to_generate],
+        points_to_generate = num_edges + int(num_edges * _generation_overhead)
+        generated_edges = numpy.random.randint(0, num_nodes, size=[points_to_generate, 2],
                                                dtype=original_dtype)
-        symmetrized_edges = numpy.empty(shape=[2*generated_edges.shape[0]], dtype=generated_edges.dtype)
-        symmetrized_edges[0::4] = generated_edges[0::2]
-        symmetrized_edges[1::4] = generated_edges[1::2]
-        symmetrized_edges[2::4] = generated_edges[1::2]
-        symmetrized_edges[3::4] = generated_edges[0::2]
-        symmetrized_edges = symmetrized_edges.view(dtype=numpy.dtype([("x", original_dtype), ("y", original_dtype)]))
-        symmetrized_edges = pandas.unique(symmetrized_edges)
-        symmetrized_edges = symmetrized_edges.view(dtype=original_dtype).reshape([symmetrized_edges.shape[0], 2])
-        symmetrized_edges = symmetrized_edges[symmetrized_edges[:, 0] != symmetrized_edges[:, 1]]
+        symmetrized_edges = numpy.concatenate([generated_edges, numpy.flip(generated_edges, axis=-1)])
+
         edge_index = numpy.concatenate([edge_index, symmetrized_edges], axis=0)
+        edge_index = numpy.unique(edge_index, axis=0)
     edge_index = torch.t(torch.from_numpy(edge_index))
     return edge_index[:, :num_edges_including_symmetric_ones]
 
