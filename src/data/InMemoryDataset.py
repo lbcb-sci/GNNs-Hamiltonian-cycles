@@ -116,7 +116,7 @@ class ErdosRenyiInMemoryDataset(torch.utils.data.Dataset):
         search_tree = []
         path_list = [Path(p) for p in path_list]
         for path in path_list:
-            to_check = [f for f in path.iterdir()] if path.is_dir else [path]
+            to_check = [f for f in path.iterdir()] if path.is_dir() else [path]
             search_tree += [f for f in to_check if f.is_file() and f.suffix == ".pt"]
         self.data_list = []
         for path in search_tree:

@@ -2,6 +2,7 @@ import torch
 import torch_geometric as torch_g
 from abc import ABC, abstractmethod
 import time
+from tqdm import tqdm
 
 
 class HamiltonSolver(ABC):
@@ -12,9 +13,11 @@ class HamiltonSolver(ABC):
     def solve(self, graph: torch_g.data.Data):
         return self.solve_graphs([graph])[0]
 
-    def timed_solve_graphs(self, graphs: list[torch_g.data.Data]) -> list[list[int]]:
+    def timed_solve_graphs(self, graphs: list[torch_g.data.Data], is_show_progress=False) -> list[list[int]]:
         times = []
         solutions = []
+        if is_show_progress:
+            graphs = tqdm(list(graphs))
         for g in graphs:
             start = time.thread_time_ns()
             solution = self.solve(g)

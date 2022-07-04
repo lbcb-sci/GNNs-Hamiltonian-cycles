@@ -114,17 +114,17 @@ class EvaluationScores:
         return evals
 
     @staticmethod
-    def evaluate_model_on_saved_data(nn_hamilton: HamiltonSolver, nr_graphs_per_size=10, data_folders=None):
+    def evaluate_model_on_saved_data(nn_hamilton: HamiltonSolver, nr_graphs_per_size=10, data_folders=None, is_show_progress=False):
         def _compute_walks_from_graph_list_fn(graph_list):
-            return nn_hamilton.timed_solve_graphs(graph_list)
+            return nn_hamilton.timed_solve_graphs(graph_list, is_show_progress)
 
         return EvaluationScores.evaluate_on_saved_data(_compute_walks_from_graph_list_fn, nr_graphs_per_size, data_folders)
 
     @staticmethod
-    def accuracy_scores_on_saved_data(solvers: List[HamiltonSolver], solver_names: List[str], nr_graphs_per_size=10, data_folders=None, best_possible_score=None):
+    def accuracy_scores_on_saved_data(solvers: List[HamiltonSolver], solver_names: List[str], nr_graphs_per_size=10, data_folders=None, best_possible_score=None, is_show_progress=False):
         evaluations_list = []
         for solver, name in zip(solvers, solver_names):
-            evals = EvaluationScores.evaluate_model_on_saved_data(solver, nr_graphs_per_size=nr_graphs_per_size, data_folders=data_folders)
+            evals = EvaluationScores.evaluate_model_on_saved_data(solver, nr_graphs_per_size=nr_graphs_per_size, data_folders=data_folders, is_show_progress=is_show_progress)
             _df_solver_score = pandas.DataFrame(EvaluationScores.compute_accuracy_scores(evals))
             _df_solver_score["name"] = name
             evaluations_list.append(_df_solver_score)
