@@ -159,8 +159,7 @@ def load_existing_model(model_identifier, wandb_project=constants.WEIGHTS_AND_BI
 
 
 def test_on_saved_data(model: HamiltonSolver, wandb_run=None):
-    df_testing_results = EvaluationScores.accuracy_scores_on_saved_data([model], ["model"], nr_graphs_per_size=None)
-
+    df_testing_results = EvaluationScores.accuracy_scores_on_saved_data([model], ["model"], nr_graphs_per_size=None, is_show_progress=True)
     unified_test_tag = "unified_test_new"
 
     if wandb_run is not None:

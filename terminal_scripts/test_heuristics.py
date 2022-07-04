@@ -7,27 +7,26 @@ from src.ExactSolvers import ConcordeHamiltonSolver
 import src.model_utils as model_utils
 
 class HeuristicsNames:
-    CONCORDE = "concorde",
-    HYBRID_HAM = "hybrid_ham",
+    CONCORDE = "concorde"
+    HYBRID_HAM = "hybrid_ham"
     LEAST_DEGREE_FIRST = "least_degree_first"
     ALL_HEURISTICS = [CONCORDE, HYBRID_HAM, LEAST_DEGREE_FIRST]
 
 
-def evaluate_heuristic(wandb_project=constants.WEIGHTS_AND_BIASES_PROJECT, heuristics: list[String] = None, wandb_ids: list[String] = None):
+def evaluate_heuristic(wandb_project=constants.WEIGHTS_AND_BIASES_PROJECT, heuristics: list[str] = None, wandb_ids: list[str] = None):
     if heuristics is None:
         heuristics = [HeuristicsNames.CONCORDE, HeuristicsNames.HYBRID_HAM, HeuristicsNames.LEAST_DEGREE_FIRST]
         wandb_ids = None
     if wandb_ids is None:
         wandb_ids = [None for h in heuristics]
     assert len(heuristics) == len(wandb_ids), "Please provide wandb_ids for each heuristics to update"
-
     heuristics_data = {
         HeuristicsNames.LEAST_DEGREE_FIRST: (LeastDegreeFirstHeuristics(), "LeastDegreeFirstHeuristics"),
         HeuristicsNames.HYBRID_HAM: (HybridHam(), "HybridHamHeuristics"),
         HeuristicsNames.CONCORDE: (ConcordeHamiltonSolver(), "ConcordeSolver")
     }
     for h in heuristics:
-        assert h in heuristics_data, f"parameter {h} needs to be one of {list(heuristics_data.keys())}"
+        assert h in heuristics_data, f"parameter {h} needs to be one of {heuristics_data.keys()}"
 
     for heuristic, wandb_id in zip(heuristics, wandb_ids):
         solver, name = heuristics_data[heuristic]
@@ -42,7 +41,7 @@ def evaluate_heuristic(wandb_project=constants.WEIGHTS_AND_BIASES_PROJECT, heuri
 if __name__ == "__main__":
     args = sys.argv
     if len(args) < 2 or len(args) > 3:
-        print("Please provide name of the heuristic to test with or without wandb_id of the run to append it to")
+        print("Please provide the name of the heuristic to test with or without wandb_id of the run to append it to")
         exit(-115)
     elif len(args) == 2:
         heuristics = [args[1]]
