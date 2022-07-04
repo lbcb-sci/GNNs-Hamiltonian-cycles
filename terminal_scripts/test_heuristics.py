@@ -39,6 +39,10 @@ def evaluate_heuristic(wandb_project=constants.WEIGHTS_AND_BIASES_PROJECT, heuri
 
 
 if __name__ == "__main__":
+    #TODO not sure where torch changes this to hing cpu usage
+    import torch
+    torch.set_num_threads(1)
+
     args = sys.argv
     if len(args) < 2 or len(args) > 3:
         print("Please provide the name of the heuristic to test with or without wandb_id of the run to append it to")
