@@ -3,7 +3,7 @@ import itertools
 import pandas
 from pathlib import Path
 
-from src.GraphGenerators import ErdosRenyiGenerator
+from src.data.GraphGenerators import ErdosRenyiGenerator
 from src.ExactSolvers import ConcordeHamiltonSolver
 
 HAMILTONIAN_FRACTION_DATA_CSV_PATH = Path(__file__).parent / "fraction_hamiltonian_graphs.csv"
