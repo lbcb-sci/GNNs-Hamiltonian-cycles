@@ -12,7 +12,7 @@ import pytorch_lightning as torch_lightning
 import torchmetrics
 
 from src.HamiltonSolver import DataUtils, HamiltonSolver
-from src.NN_modules import ResidualMultilayerMPNN, MultilayerGatedGCN
+from src.nn_modules.nn_modules import ResidualMultilayerMPNN, MultilayerGatedGCN
 from src.data.GraphDataset import BatchedSimulationStates, GraphBatchExample, GraphExample, SimulationState, get_shifts_for_graphs_in_batch
 import src.Evaluation as Evaluation
 import src.solution_scorers as scorers

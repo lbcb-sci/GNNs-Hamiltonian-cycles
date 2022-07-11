@@ -3,7 +3,7 @@ import wandb
 
 
 from src.ExactSolvers import ConcordeHamiltonSolver
-from src.Development_code.Heuristics import HybridHam
+from src.Heuristics import HybridHam
 from src.genomic_test_tools import *
 
 

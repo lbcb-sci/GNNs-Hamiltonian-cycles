@@ -2,7 +2,7 @@ import sys
 import wandb
 
 import src.constants as constants
-from src.Development_code.Heuristics import LeastDegreeFirstHeuristics, HybridHam
+from src.heuristics import LeastDegreeFirstHeuristics, HybridHam
 from src.ExactSolvers import ConcordeHamiltonSolver
 import src.model_utils as model_utils
 

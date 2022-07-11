@@ -4,7 +4,7 @@ from pathlib import Path
 from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts
 from pytorch_lightning.callbacks import LearningRateMonitor, ModelCheckpoint
 
-import src.Models as Models
+import src.nn_modules.Models as Models
 import src.data.DataModules as DataModules
 import src.data.genomic_datasets as genomic_datasets
 import src.model_utils as model_utils
