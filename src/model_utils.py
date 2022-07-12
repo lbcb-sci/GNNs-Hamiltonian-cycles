@@ -10,11 +10,11 @@ import pytorch_lightning.loggers as lightning_loggers
 import pytorch_lightning.callbacks as lightning_callbacks
 import wandb
 
-import src.Models as models
 from src.Evaluation import EvaluationScores
 from src.HamiltonSolver import HamiltonSolver
 import src.data.DataModules as DataModules
 import src.constants as constants
+import src.nn_modules.hamilton_gnn_utils as gnn_utils
 
 
 def train_model(model_class, datamodule_class, model_checkpoint=None, model_hyperparams=None, datamodule_hyperparams=None,
@@ -99,7 +99,7 @@ def reconnect_to_wandb_run(wandb_run_id):
 
 
 def create_model_from_checkpoint(checkpoint_path):
-    model_classes = [var for var_name, var in vars(models).items() if isclass(var) and issubclass(var, models.HamFinderGNN)]
+    model_classes = gnn_utils.list_of_gnn_model_classes()
     model = None
     for c in model_classes:
         try:
@@ -160,7 +160,7 @@ def load_existing_model(model_identifier, wandb_project=constants.WEIGHTS_AND_BI
 
 def test_on_saved_data(model: HamiltonSolver, wandb_run=None):
     df_testing_results = EvaluationScores.accuracy_scores_on_saved_data([model], ["model"], nr_graphs_per_size=None, is_show_progress=True)
-    unified_test_tag = "unified_test_new"
+    unified_test_tag = "fixed_ER_saved"
 
     if wandb_run is not None:
         for row_index, row in df_testing_results.iterrows():

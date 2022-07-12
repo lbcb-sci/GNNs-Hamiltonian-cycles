@@ -4,14 +4,16 @@ from pathlib import Path
 from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts
 from pytorch_lightning.callbacks import LearningRateMonitor, ModelCheckpoint
 
-import src.nn_modules.Models as Models
+from src.nn_modules.EncodeProcessDecodeNN import EncodeProcessDecodeAlgorithm
+from src.nn_modules.EncodeProcessDecodeNoHiddenNN import _EncodeProcessDecodeNoHidden
+from src.nn_modules.EmbeddingAndMaxMPNN import EmbeddingAndMaxMPNN
 import src.data.DataModules as DataModules
 import src.data.genomic_datasets as genomic_datasets
 import src.model_utils as model_utils
 import src.callbacks as my_callbacks
 
 train_request_HamS = model_utils.ModelTrainRequest(
-    model_class = Models.EncodeProcessDecodeAlgorithm,
+    model_class = EncodeProcessDecodeAlgorithm,
     datamodule_class = DataModules.ArtificialCycleWithDoubleEvaluationDataModule,
     model_checkpoint = None,
     model_hyperparams = {
@@ -126,7 +128,7 @@ train_request_HamS_mse_large_faster.arguments["model_hyperparams"]["starting_lea
 
 
 train_request_HamS_no_hidden = copy.deepcopy(train_request_HamS)
-train_request_HamS_no_hidden.arguments["model_class"] = Models._EncodeProcessDecodeNoHidden
+train_request_HamS_no_hidden.arguments["model_class"] = _EncodeProcessDecodeNoHidden
 
 train_request_HamS200_no_hidden = copy.deepcopy(train_request_HamS_no_hidden)
 train_request_HamS200_no_hidden.arguments["datamodule_hyperparams"]["train_graph_size"] = 200
@@ -187,7 +189,7 @@ train_request_HamS_rare_really_small.arguments["datamodule_hyperparams"].update(
 train_request_HamR = model_utils.ModelTrainRequest(
     # is_log_offline=True,
     # is_log_model=False,
-    model_class = Models.EmbeddingAndMaxMPNN,
+    model_class = EmbeddingAndMaxMPNN,
     datamodule_class = DataModules.ReinforcementErdosRenyiDataModule,
     model_checkpoint = None,
     model_hyperparams = {
