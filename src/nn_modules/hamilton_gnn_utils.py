@@ -1,3 +1,7 @@
+from pathlib import Path
+import pkgutil
+import importlib
+from inspect import isclass
 from abc import abstractmethod
 import itertools
 import numpy
@@ -11,6 +15,14 @@ import pytorch_lightning as torch_lightning
 
 from src.HamiltonSolver import DataUtils, HamiltonSolver
 import src.Evaluation as Evaluation
+
+
+def list_of_gnn_model_classes():
+    model_classes = []
+    for (_, module_name, _) in pkgutil.iter_modules([Path(__file__).resolve().parent]):
+        module = importlib.import_module(f"{__name__}.{module_name}")
+        model_classes.extend([var for var_name, var in vars(module).items() if isclass(var) and issubclass(var, HamFinderGNN)])
+    return model_classes
 
 
 class WalkUpdater:
