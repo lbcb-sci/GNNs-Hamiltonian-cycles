@@ -61,6 +61,7 @@ class ConcordeHamiltonSolver(HamiltonSolver):
 
     # INPUT FILE CREATION TAKES A LONG TIME (QUADRATIC COMPLEXITY) SO THE RESULTS CAN BE UNINTUITIVE!
     def time_execution(self, d: torch_g.data.Data, input_file=None, is_consume_input_file=False):
+        # TODO NEED TO CHECK IF CONCORDE IS PROPERLY INSTALLED!
         if input_file is None:
             self.create_input_file(d)
             is_consume_input_file=True
