@@ -1,7 +1,7 @@
 import os
 
-from src.constants import DEFAULT_DATASET_SIZES
-from src.Evaluation import EvaluationScores
+from hamgnn.constants import DEFAULT_DATASET_SIZES
+from hamgnn.Evaluation import EvaluationScores
 
 EVALUATION_DATABASE_PATH = os.path.join("EVALUATIONS", "Evaluation_results.csv")
 EVALUATION_WEIGHTS_BACKUP_PATH = os.path.join("EVALUATIONS", "WEIGHTS_BACKUP")

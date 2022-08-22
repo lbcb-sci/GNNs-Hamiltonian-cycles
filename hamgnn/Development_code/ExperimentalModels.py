@@ -4,9 +4,9 @@ import itertools
 import os
 import torchinfo
 
-from src.NN_modules import MultilayerGatedGCN
+from hamgnn.NN_modules import MultilayerGatedGCN
 from Experimental_NN_modules import ResidualMultilayerMPNN3DeepMessages, ResidualMultilayerAttentionMPNNWithEdgeFeatures
-from src.Models import EncodeProcessDecodeAlgorithm, WalkUpdater, DEVICE, MODEL_WEIGHTS_FOLDER
+from hamgnn.Models import EncodeProcessDecodeAlgorithm, WalkUpdater, DEVICE, MODEL_WEIGHTS_FOLDER
 
 
 class EncodeProcessDecodeWithDeepMessagesAlgorithm(EncodeProcessDecodeAlgorithm):

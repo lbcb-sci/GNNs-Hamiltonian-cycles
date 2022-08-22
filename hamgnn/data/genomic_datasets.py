@@ -3,8 +3,8 @@ import torch
 import torch_geometric as torch_g
 import pytorch_lightning as torch_lightning
 
-from src.data.DataModules import LIGHTNING_MODULE_REFERENCE
-from src.data.GraphDataset import GraphExample, GraphDataLoader
+from hamgnn.data.DataModules import LIGHTNING_MODULE_REFERENCE
+from hamgnn.data.GraphDataset import GraphExample, GraphDataLoader
 from OlcGraph import OlcGraph
 import olc_graph_tools
 

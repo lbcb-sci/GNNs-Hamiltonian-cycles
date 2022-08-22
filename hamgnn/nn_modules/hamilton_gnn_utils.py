@@ -13,8 +13,8 @@ import torch_geometric as torch_g
 import torch_scatter
 import pytorch_lightning as torch_lightning
 
-from src.HamiltonSolver import DataUtils, HamiltonSolver
-import src.Evaluation as Evaluation
+from hamgnn.HamiltonSolver import DataUtils, HamiltonSolver
+import hamgnn.Evaluation as Evaluation
 
 
 def list_of_gnn_model_classes():

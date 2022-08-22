@@ -1,8 +1,8 @@
 import torch
 import torch_geometric as torch_g
 
-from src.Models import HamFinderGNN, HamCycleFinderWithValueFunction
-from src.Trainers import SupervisedTrainFollowingHamiltonCycle, REINFORCE_WithLearnableBaseline
+from hamgnn.Models import HamFinderGNN, HamCycleFinderWithValueFunction
+from hamgnn.Trainers import SupervisedTrainFollowingHamiltonCycle, REINFORCE_WithLearnableBaseline
 
 
 class NeighborMaskedSupervisedTrainFollowingHamiltonCycle(SupervisedTrainFollowingHamiltonCycle):

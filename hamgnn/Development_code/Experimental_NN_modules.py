@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch_scatter
 
-from src.NN_modules import ResidualMultilayerMPNN
+from hamgnn.NN_modules import ResidualMultilayerMPNN
 
 
 class ResidualMultilayerMPNN3DeepMessages(ResidualMultilayerMPNN):

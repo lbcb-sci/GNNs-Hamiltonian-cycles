@@ -60,7 +60,7 @@ eval_sizes.sort()
 
 
 def count_hamilton_cycles_in_data():
-    from src.DatasetBuilder import ErdosRenyiInMemoryDataset
+    from hamgnn.DatasetBuilder import ErdosRenyiInMemoryDataset
     dataset = ErdosRenyiInMemoryDataset(["DATA"])
     hamiltonian_per_size = {}
     examples_per_size = {}

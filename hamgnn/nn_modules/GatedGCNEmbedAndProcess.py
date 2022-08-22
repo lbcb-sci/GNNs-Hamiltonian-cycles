@@ -2,8 +2,8 @@
 import torch
 import torch_geometric as torch_g
 
-from src.nn_modules.nn_modules import MultilayerGatedGCN
-from src.nn_modules.EmbeddingAndMaxMPNN import EmbeddingAndMaxMPNN
+from hamgnn.nn_modules.nn_modules import MultilayerGatedGCN
+from hamgnn.nn_modules.EmbeddingAndMaxMPNN import EmbeddingAndMaxMPNN
 
 
 class GatedGCNEmbedAndProcess(EmbeddingAndMaxMPNN):

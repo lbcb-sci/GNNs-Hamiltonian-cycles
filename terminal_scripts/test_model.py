@@ -2,8 +2,8 @@ import sys
 import wandb
 from pathlib import Path
 
-import src.constants as constants
-import src.model_utils as model_utils
+import hamgnn.constants as constants
+import hamgnn.model_utils as model_utils
 
 if __name__ == "__main__":
     args = sys.argv

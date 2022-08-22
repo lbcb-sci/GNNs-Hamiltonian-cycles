@@ -5,10 +5,10 @@ import wandb
 
 from OlcGraph import OlcGraph
 
-import src.model_utils as model_utils
-from src.HamiltonSolver import HamiltonSolver
-import src.constants as constants
-from src.Evaluation import EvaluationScores
+import hamgnn.model_utils as model_utils
+from hamgnn.HamiltonSolver import HamiltonSolver
+import hamgnn.constants as constants
+from hamgnn.Evaluation import EvaluationScores
 
 def test_on_genomic_graphs(model: HamiltonSolver, graph_paths: list[Path]):
     assert all([path.name.endswith(".gml") for path in graph_paths])

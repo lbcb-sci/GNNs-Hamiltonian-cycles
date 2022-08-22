@@ -1,5 +1,5 @@
 # %%
-from src.Models import EncodeProcessDecodeAlgorithm, GatedGCNEmbedAndProcess
+from hamgnn.Models import EncodeProcessDecodeAlgorithm, GatedGCNEmbedAndProcess
 
 import torch
 # %%
@@ -8,7 +8,7 @@ HamR = GatedGCNEmbedAndProcess(True, embedding_depth=8, processor_depth=5, hidde
 
 # %%
 import pytorch_lightning
-from src.data.DataModules import ArtificialCycleDataModule
+from hamgnn.data.DataModules import ArtificialCycleDataModule
 
 datamodule = ArtificialCycleDataModule()
 trainer = pytorch_lightning.Trainer(max_epochs=0, num_sanity_val_steps=0)

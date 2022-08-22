@@ -7,7 +7,7 @@ import pandas
 from typing import List, Iterator
 from abc import ABC, abstractmethod
 
-from src.data.GraphDataset import GraphExample
+from hamgnn.data.GraphDataset import GraphExample
 
 
 class GraphGenerator(ABC):

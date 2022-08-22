@@ -10,11 +10,11 @@ import pytorch_lightning.loggers as lightning_loggers
 import pytorch_lightning.callbacks as lightning_callbacks
 import wandb
 
-from src.Evaluation import EvaluationScores
-from src.HamiltonSolver import HamiltonSolver
-import src.data.DataModules as DataModules
-import src.constants as constants
-import src.nn_modules.hamilton_gnn_utils as gnn_utils
+from hamgnn.Evaluation import EvaluationScores
+from hamgnn.HamiltonSolver import HamiltonSolver
+import hamgnn.data.DataModules as DataModules
+import hamgnn.constants as constants
+import hamgnn.nn_modules.hamilton_gnn_utils as gnn_utils
 
 
 def train_model(model_class, datamodule_class, model_checkpoint=None, model_hyperparams=None, datamodule_hyperparams=None,

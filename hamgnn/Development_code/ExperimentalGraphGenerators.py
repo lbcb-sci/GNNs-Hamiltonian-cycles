@@ -2,7 +2,7 @@ import torch
 import torch_geometric as torch_g
 import itertools
 
-from src.GraphGenerators import ErdosRenyiGenerator
+from hamgnn.GraphGenerators import ErdosRenyiGenerator
 
 
 class NoisyCycleGenerator:

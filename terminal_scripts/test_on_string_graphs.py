@@ -2,9 +2,9 @@ from pathlib import Path
 import wandb
 
 
-from src.ExactSolvers import ConcordeHamiltonSolver
-from src.Heuristics import HybridHam
-from src.genomic_test_tools import *
+from hamgnn.ExactSolvers import ConcordeHamiltonSolver
+from hamgnn.Heuristics import HybridHam
+from hamgnn.genomic_test_tools import *
 
 
 if __name__ == "__main__":

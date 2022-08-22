@@ -12,8 +12,8 @@ import warnings
 import torch
 import torch_geometric as torch_g
 
-from src.HamiltonSolver import HamiltonSolver
-from src.constants import CONCORDE_SCRIPT_PATH, CONCORDE_WORK_DIR, CONCORDE_INPUT_FILE
+from hamgnn.HamiltonSolver import HamiltonSolver
+from hamgnn.constants import CONCORDE_SCRIPT_PATH, CONCORDE_WORK_DIR, CONCORDE_INPUT_FILE
 
 
 class ConcordeHamiltonSolver(HamiltonSolver):

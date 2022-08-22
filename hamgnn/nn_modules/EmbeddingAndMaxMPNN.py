@@ -2,11 +2,11 @@ import torch
 import torch_geometric as torch_g
 import torchinfo
 
-from src.HamiltonSolver import DataUtils
-from src.nn_modules.nn_modules import ResidualMultilayerMPNN
-from src.data.GraphDataset import BatchedSimulationStates, GraphBatchExample, GraphExample, SimulationState
-import src.solution_scorers as scorers
-import src.nn_modules.hamilton_gnn_utils as gnn_utils
+from hamgnn.HamiltonSolver import DataUtils
+from hamgnn.nn_modules.nn_modules import ResidualMultilayerMPNN
+from hamgnn.data.GraphDataset import BatchedSimulationStates, GraphBatchExample, GraphExample, SimulationState
+import hamgnn.solution_scorers as scorers
+import hamgnn.nn_modules.hamilton_gnn_utils as gnn_utils
 
 
 class EmbeddingAndMaxMPNN(gnn_utils.HamCycleFinderWithValueFunction):

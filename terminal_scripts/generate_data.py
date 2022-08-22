@@ -1,7 +1,7 @@
 import torch
 
-from src.data.InMemoryDataset import ErdosRenyiInMemoryDataset
-from src.constants import EVALUATION_DATA_FOLDERS, DEFAULT_DATASET_SIZES, DEFAULT_EXAMPLES_PER_SIZE_IN_DATASET,\
+from hamgnn.data.InMemoryDataset import ErdosRenyiInMemoryDataset
+from hamgnn.constants import EVALUATION_DATA_FOLDERS, DEFAULT_DATASET_SIZES, DEFAULT_EXAMPLES_PER_SIZE_IN_DATASET,\
     HAMILTONIAN_PROBABILITY
 
 

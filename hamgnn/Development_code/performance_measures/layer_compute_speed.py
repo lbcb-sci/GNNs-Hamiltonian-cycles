@@ -13,13 +13,13 @@ from torch.profiler import profile, record_function, ProfilerActivity
 import torch_geometric as torch_g
 import torch_scatter
 
-from src.DatasetBuilder import ErdosRenyiInMemoryDataset, ErdosRenyiGenerator
-from src.Models import GatedGCNEmbedAndProcess, HamFinderGNN, EncodeProcessDecodeAlgorithm
-from src.ExactSolvers import ConcordeHamiltonSolver
-from src.NN_modules import ResidualMultilayerMPNN
-from src.Development_code.Heuristics import least_degree_first_heuristics, HybridHam
+from hamgnn.DatasetBuilder import ErdosRenyiInMemoryDataset, ErdosRenyiGenerator
+from hamgnn.Models import GatedGCNEmbedAndProcess, HamFinderGNN, EncodeProcessDecodeAlgorithm
+from hamgnn.ExactSolvers import ConcordeHamiltonSolver
+from hamgnn.NN_modules import ResidualMultilayerMPNN
+from hamgnn.Development_code.Heuristics import least_degree_first_heuristics, HybridHam
 
-from src.Evaluation import EvaluationScores, EvaluationPlots
+from hamgnn.Evaluation import EvaluationScores, EvaluationPlots
 
 
 def _time_operation_cpu(operation, dataset):

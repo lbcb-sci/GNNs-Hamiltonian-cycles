@@ -4,7 +4,7 @@ import networkx as nx
 import torch
 from copy import deepcopy
 
-from src.Models import HamiltonSolver
+from hamgnn.Models import HamiltonSolver
 
 def _to_networkit(num_nodes, edge_index: torch.tensor):
     g = networkit.Graph(num_nodes)
@@ -135,7 +135,7 @@ def load_graph_from_hcp_file(hcp_path):
 
 
 if __name__ == '__main__':
-    from src.data.GraphGenerators import ErdosRenyiGenerator
+    from hamgnn.data.GraphGenerators import ErdosRenyiGenerator
     import itertools
     import torch_geometric
     import networkx
@@ -151,7 +151,7 @@ if __name__ == '__main__':
     # print(solution)
 
     m = HybridHam()
-    import src.Evaluation as eval
+    import hamgnn.Evaluation as eval
     evals = eval.EvaluationScores.evaluate_model_on_saved_data(m, 10000)
     acc = eval.EvaluationScores.compute_accuracy_scores(evals)
 

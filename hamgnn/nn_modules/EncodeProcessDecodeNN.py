@@ -4,9 +4,9 @@ import torch.nn.functional as F
 import torch_geometric as torch_g
 import torchinfo
 
-from src.nn_modules.nn_modules import ResidualMultilayerMPNN
-import src.nn_modules.hamilton_gnn_utils as gnn_utils
-from src.data.GraphDataset import get_shifts_for_graphs_in_batch
+from hamgnn.nn_modules.nn_modules import ResidualMultilayerMPNN
+import hamgnn.nn_modules.hamilton_gnn_utils as gnn_utils
+from hamgnn.data.GraphDataset import get_shifts_for_graphs_in_batch
 
 
 class EncodeProcessDecodeAlgorithm(gnn_utils.HamFinderGNN):

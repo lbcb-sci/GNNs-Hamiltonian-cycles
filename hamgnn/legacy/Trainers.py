@@ -8,7 +8,7 @@ import torch
 import torch_geometric as torch_g
 from matplotlib import pyplot as plt
 
-from src.Models import HamFinderGNN, HamCycleFinderWithValueFunction
+from hamgnn.Models import HamFinderGNN, HamCycleFinderWithValueFunction
 
 
 class TrainAlgorithm(ABC):

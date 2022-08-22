@@ -3,11 +3,11 @@ import os
 import torch
 import torch.multiprocessing as mp
 
-from src.Models import EncodeProcessDecodeAlgorithm, GatedGCNEmbedAndProcess, MODEL_WEIGHTS_FOLDER
-from src.Trainers import SupervisedTrainFollowingHamiltonCycle, REINFORCE_WithLearnableBaseline
-from src.data.GraphGenerators import ErdosRenyiGenerator, NoisyCycleBatchGenerator
-from src.Evaluation import EvaluationScores
-from src.constants import HAMILTONIAN_PROBABILITY, MAX_NR_BATCHES_TO_USE_FOR_EVALUATION, EVALUATION_DATA_FOLDERS
+from hamgnn.Models import EncodeProcessDecodeAlgorithm, GatedGCNEmbedAndProcess, MODEL_WEIGHTS_FOLDER
+from hamgnn.Trainers import SupervisedTrainFollowingHamiltonCycle, REINFORCE_WithLearnableBaseline
+from hamgnn.data.GraphGenerators import ErdosRenyiGenerator, NoisyCycleBatchGenerator
+from hamgnn.Evaluation import EvaluationScores
+from hamgnn.constants import HAMILTONIAN_PROBABILITY, MAX_NR_BATCHES_TO_USE_FOR_EVALUATION, EVALUATION_DATA_FOLDERS
 
 
 def train_HamS(is_load_weight=False, train_epochs=2000):

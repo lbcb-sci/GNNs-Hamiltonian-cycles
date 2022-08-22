@@ -9,10 +9,10 @@ from collections import defaultdict
 import torch.utils.data
 import torch_geometric
 
-import src.data.GraphGenerators as GraphGenerators
-import src.data.GraphDataset as GraphDataset
-import src.ExactSolvers as ExactSolvers
-from src.data.GraphDataset import GraphExample
+import hamgnn.data.GraphGenerators as GraphGenerators
+import hamgnn.data.GraphDataset as GraphDataset
+import hamgnn.ExactSolvers as ExactSolvers
+from hamgnn.data.GraphDataset import GraphExample
 
 
 class ErdosRenyiGraphExample(GraphExample):

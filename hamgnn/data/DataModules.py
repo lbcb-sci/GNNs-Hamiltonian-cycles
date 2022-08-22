@@ -1,9 +1,9 @@
 import pytorch_lightning as torch_lightning
 
-import src.constants as constants
-from src.data.InMemoryDataset import ErdosRenyiInMemoryDataset
-from src.data.GraphDataset import FilterSolvableGraphsGeneratingDataset, GraphGeneratingDataset, GraphDataLoader, SimulationStatesDataLoader, SimulationsDataset
-from src.data.GraphGenerators import ErdosRenyiExamplesGenerator, ErdosRenyiGenerator, NoisyCycleGenerator
+import hamgnn.constants as constants
+from hamgnn.data.InMemoryDataset import ErdosRenyiInMemoryDataset
+from hamgnn.data.GraphDataset import FilterSolvableGraphsGeneratingDataset, GraphGeneratingDataset, GraphDataLoader, SimulationStatesDataLoader, SimulationsDataset
+from hamgnn.data.GraphGenerators import ErdosRenyiExamplesGenerator, ErdosRenyiGenerator, NoisyCycleGenerator
 
 
 LIGHTNING_MODULE_REFERENCE = "lightning_module_reference"

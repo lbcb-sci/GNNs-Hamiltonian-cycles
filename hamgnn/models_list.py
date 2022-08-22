@@ -4,13 +4,13 @@ from pathlib import Path
 from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts
 from pytorch_lightning.callbacks import LearningRateMonitor, ModelCheckpoint
 
-from src.nn_modules.EncodeProcessDecodeNN import EncodeProcessDecodeAlgorithm
-from src.nn_modules.EncodeProcessDecodeNoHiddenNN import _EncodeProcessDecodeNoHidden
-from src.nn_modules.EmbeddingAndMaxMPNN import EmbeddingAndMaxMPNN
-import src.data.DataModules as DataModules
-import src.data.genomic_datasets as genomic_datasets
-import src.model_utils as model_utils
-import src.callbacks as my_callbacks
+from hamgnn.nn_modules.EncodeProcessDecodeNN import EncodeProcessDecodeAlgorithm
+from hamgnn.nn_modules.EncodeProcessDecodeNoHiddenNN import _EncodeProcessDecodeNoHidden
+from hamgnn.nn_modules.EmbeddingAndMaxMPNN import EmbeddingAndMaxMPNN
+import hamgnn.data.DataModules as DataModules
+import hamgnn.data.genomic_datasets as genomic_datasets
+import hamgnn.model_utils as model_utils
+import hamgnn.callbacks as my_callbacks
 
 train_request_HamS = model_utils.ModelTrainRequest(
     model_class = EncodeProcessDecodeAlgorithm,

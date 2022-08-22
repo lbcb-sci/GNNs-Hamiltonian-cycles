@@ -3,7 +3,7 @@ import torch
 import torch.nn.functional as F
 import torch_geometric as torch_g
 
-from src.nn_modules.EncodeProcessDecodeNN import EncodeProcessDecodeAlgorithm
+from hamgnn.nn_modules.EncodeProcessDecodeNN import EncodeProcessDecodeAlgorithm
 
 class _EncodeProcessDecodeNoHidden(EncodeProcessDecodeAlgorithm):
     def _construct_encoder_and_decoder(self):

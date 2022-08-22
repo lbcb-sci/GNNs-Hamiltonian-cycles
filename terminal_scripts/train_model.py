@@ -1,7 +1,7 @@
 import sys
 
-import src.models_list as models_list
-import src.model_utils as model_utils
+import hamgnn.models_list as models_list
+import hamgnn.model_utils as model_utils
 
 
 if __name__ == "__main__":

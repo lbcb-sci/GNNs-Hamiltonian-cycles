@@ -1,10 +1,10 @@
 import sys
 import wandb
 
-import src.constants as constants
-from src.heuristics import LeastDegreeFirstHeuristics, HybridHam
-from src.ExactSolvers import ConcordeHamiltonSolver
-import src.model_utils as model_utils
+import hamgnn.constants as constants
+from hamgnn.heuristics import LeastDegreeFirstHeuristics, HybridHam
+from hamgnn.ExactSolvers import ConcordeHamiltonSolver
+import hamgnn.model_utils as model_utils
 
 class HeuristicsNames:
     CONCORDE = "concorde"

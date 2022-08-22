@@ -8,9 +8,9 @@ import torch
 import torch.utils.data
 import torch_geometric as torch_g
 
-import src.data.InMemoryDataset as InMemoryDataset
-from src.HamiltonSolver import HamiltonSolver
-from src.constants import *
+import hamgnn.data.InMemoryDataset as InMemoryDataset
+from hamgnn.HamiltonSolver import HamiltonSolver
+from hamgnn.constants import *
 
 
 class EvaluationScores:

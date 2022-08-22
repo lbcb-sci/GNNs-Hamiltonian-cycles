@@ -3,7 +3,7 @@ import torch.nn.functional as F
 import torch_geometric as torch_g
 from abc import ABC
 
-from src.HamiltonSolver import DataUtils
+from hamgnn.HamiltonSolver import DataUtils
 
 class ReinforcementScorer(ABC):
     def batch_reward(self, d: torch_g.data.Batch, choices, simulation_running_flag=None) -> torch.Tensor:

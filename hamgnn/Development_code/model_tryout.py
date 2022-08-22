@@ -9,13 +9,13 @@ from portalocker import Lock
 import time
 
 from DBModelRecording import EVALUATION_DATABASE_PATH, create_archive_evaluation_entry
-from src.Models import EmbeddingAndMaxMPNN, EncodeProcessDecodeAlgorithm, GatedGCNEmbedAndProcess
-from src.Development_code.ExperimentalModels import GatedGCNEncodeProcessDecodeAlgorithm, EncodeProcessDecodeWithEdgeFeatures, EncodeProcessDecodeWithDeepMessagesAlgorithm
-from src.Trainers import SupervisedTrainFollowingHamiltonCycle,\
+from hamgnn.Models import EmbeddingAndMaxMPNN, EncodeProcessDecodeAlgorithm, GatedGCNEmbedAndProcess
+from hamgnn.Development_code.ExperimentalModels import GatedGCNEncodeProcessDecodeAlgorithm, EncodeProcessDecodeWithEdgeFeatures, EncodeProcessDecodeWithDeepMessagesAlgorithm
+from hamgnn.Trainers import SupervisedTrainFollowingHamiltonCycle,\
     REINFORCE_WithLearnableBaseline, plot_history
-from src.Development_code.ExperimentalTrainers import NeighborMaskedSupervisedTrainFollowingHamiltonCycle, REINFOCE_With_Averaged_simulations
-from src.GraphGenerators import ErdosRenyiGenerator, NoisyCycleBatchGenerator
-from src.constants import EVALUATION_DATABASE_LOCK_PATH
+from hamgnn.Development_code.ExperimentalTrainers import NeighborMaskedSupervisedTrainFollowingHamiltonCycle, REINFOCE_With_Averaged_simulations
+from hamgnn.GraphGenerators import ErdosRenyiGenerator, NoisyCycleBatchGenerator
+from hamgnn.constants import EVALUATION_DATABASE_LOCK_PATH
 
 
 class HamiltonModelLogRequest(ABC):

@@ -6,7 +6,7 @@ import torch
 import torch.nn.functional as F
 import torch_geometric as torch_geometric
 
-from src.ExactSolvers import ConcordeHamiltonSolver
+from hamgnn.ExactSolvers import ConcordeHamiltonSolver
 
 
 def get_shifts_for_graphs_in_batch(batch_graph: torch_geometric.data.Batch):

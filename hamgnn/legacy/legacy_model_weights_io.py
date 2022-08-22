@@ -3,8 +3,8 @@ from pathlib import Path
 
 import torch
 
-from src.Models import EncodeProcessDecodeAlgorithm, GatedGCNEmbedAndProcess, WalkUpdater
-from src.solution_scorers import CombinatorialScorer
+from hamgnn.Models import EncodeProcessDecodeAlgorithm, GatedGCNEmbedAndProcess, WalkUpdater
+from hamgnn.solution_scorers import CombinatorialScorer
 
 LEGACY_WEIGHTS_STORAGE_DIR = "legacy_model_weights"
 

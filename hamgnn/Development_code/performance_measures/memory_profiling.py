@@ -2,8 +2,8 @@ import torch
 import torch_geometric as torch_g
 import time
 
-from src.Models import EncodeProcessDecodeAlgorithm
-from src.GraphGenerators import ErdosRenyiGenerator
+from hamgnn.Models import EncodeProcessDecodeAlgorithm
+from hamgnn.GraphGenerators import ErdosRenyiGenerator
 
 if __name__ == '__main__':
     sizes = [500, 1000, 2000]
