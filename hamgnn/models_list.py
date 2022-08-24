@@ -8,7 +8,6 @@ from hamgnn.nn_modules.EncodeProcessDecodeNN import EncodeProcessDecodeAlgorithm
 from hamgnn.nn_modules.EncodeProcessDecodeNoHiddenNN import _EncodeProcessDecodeNoHidden
 from hamgnn.nn_modules.EmbeddingAndMaxMPNN import EmbeddingAndMaxMPNN
 import hamgnn.data.DataModules as DataModules
-import hamgnn.data.genomic_datasets as genomic_datasets
 import hamgnn.model_utils as model_utils
 import hamgnn.callbacks as my_callbacks
 
@@ -134,26 +133,6 @@ train_request_HamS200_no_hidden = copy.deepcopy(train_request_HamS_no_hidden)
 train_request_HamS200_no_hidden.arguments["datamodule_hyperparams"]["train_graph_size"] = 200
 
 
-data_root_folder = (Path(__file__).parent / "../genome_graphs/SnakemakePipeline").resolve()
-train_request_HamS_genomes = copy.deepcopy(train_request_HamS)
-train_request_HamS_genomes.arguments["model_hyperparams"].update({
-    "val_dataloader_tags": None,
-    "loss_type": "mse"
-})
-train_request_HamS_genomes.arguments["datamodule_class"] = genomic_datasets.StringGraphDatamodule
-train_request_HamS_genomes.arguments["datamodule_hyperparams"] = {
-    "train_batch_size": 1,
-    "val_batch_size": 1,
-    "train_paths": (data_root_folder / "string_graphs_train.txt").read_text().split(),
-    "val_paths": (data_root_folder / "string_graphs_val.txt").read_text().split(),
-    "test_paths": (data_root_folder / "string_graphs_test.txt").read_text().split()
-}
-train_request_HamS_genomes.arguments["trainer_hyperparams"]["callbacks"] = lr_callbacks + norm_monitoring_callbacks + [ModelCheckpoint(save_top_k=3, save_last=True, monitor="val/hamiltonian_cycle")]
-
-train_request_HamS_genomes_lr = copy.deepcopy(train_request_HamS_genomes)
-train_request_HamS_genomes_lr.arguments["model_hyperparams"]["starting_learning_rate"] = 1e-7
-
-
 train_request_HamS_rare_artificial_cycle = copy.deepcopy(train_request_HamS)
 train_request_HamS_rare_artificial_cycle.arguments["datamodule_class"] = DataModules.ArtificialCycleDataModule
 train_request_HamS_rare_artificial_cycle.arguments["datamodule_hyperparams"] = {
@@ -183,6 +162,30 @@ train_request_HamS_rare_really_small.arguments["datamodule_hyperparams"].update(
     "train_expected_noise_edges_per_node": 0.07,
     "val_expected_noise_edges_per_node": 0.07
 })
+
+
+# # Training on genomic data
+# import hamgnn.data.genomic_datasets as genomic_datasets
+# data_root_folder = (Path(__file__).parent / "../genome_graphs/SnakemakePipeline").resolve()
+# train_request_HamS_genomes = copy.deepcopy(train_request_HamS)
+# train_request_HamS_genomes.arguments["model_hyperparams"].update({
+#     "val_dataloader_tags": None,
+#     "loss_type": "mse"
+# })
+# train_request_HamS_genomes.arguments["datamodule_class"] = genomic_datasets.StringGraphDatamodule
+# train_request_HamS_genomes.arguments["datamodule_hyperparams"] = {
+#     "train_batch_size": 1,
+#     "val_batch_size": 1,
+#     "train_paths": (data_root_folder / "string_graphs_train.txt").read_text().split(),
+#     "val_paths": (data_root_folder / "string_graphs_val.txt").read_text().split(),
+#     "test_paths": (data_root_folder / "string_graphs_test.txt").read_text().split()
+# }
+# train_request_HamS_genomes.arguments["trainer_hyperparams"]["callbacks"] = lr_callbacks + norm_monitoring_callbacks + [ModelCheckpoint(save_top_k=3, save_last=True, monitor="val/hamiltonian_cycle")]
+
+# train_request_HamS_genomes_lr = copy.deepcopy(train_request_HamS_genomes)
+# train_request_HamS_genomes_lr.arguments["model_hyperparams"]["starting_learning_rate"] = 1e-7
+
+
 
 ### Reinforcement learning models
 
