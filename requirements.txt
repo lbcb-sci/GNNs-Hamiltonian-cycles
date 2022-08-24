@@ -1,0 +1,8 @@
+python>=3.8
+pytorch>=1.8
+numpy>=1.21
+pytorch-lightning
+torchvision
+torchaudio
+cudatoolkit>=10.2
+pyg
