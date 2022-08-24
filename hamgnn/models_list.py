@@ -163,6 +163,14 @@ train_request_HamS_rare_really_small.arguments["datamodule_hyperparams"].update(
     "val_expected_noise_edges_per_node": 0.07
 })
 
+# GPU training
+train_request_HamS_gpu = copy.deepcopy(train_request_HamS)
+train_request_HamS_gpu.arguments["datamodule_class"] = DataModules.ArtificialCycleDataModule
+del train_request_HamS_gpu.arguments["datamodule_hyperparams"]["val_hamiltonian_existence_probability"]
+train_request_HamS_gpu.arguments["trainer_hyperparams"].update({
+    "gpus": [0]
+})
+
 
 # # Training on genomic data
 # import hamgnn.data.genomic_datasets as genomic_datasets
