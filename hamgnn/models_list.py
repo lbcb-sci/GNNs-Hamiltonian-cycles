@@ -167,10 +167,12 @@ train_request_HamS_rare_really_small.arguments["datamodule_hyperparams"].update(
 train_request_HamS_gpu = copy.deepcopy(train_request_HamS)
 train_request_HamS_gpu.arguments["datamodule_class"] = DataModules.ArtificialCycleDataModule
 del train_request_HamS_gpu.arguments["datamodule_hyperparams"]["val_hamiltonian_existence_probability"]
+train_request_HamS_gpu.arguments["model_hyperparams"]["val_dataloader_tags"] = ["artificial"]
 train_request_HamS_gpu.arguments["trainer_hyperparams"].update({
     "gpus": [0]
 })
-
+train_request_HamS_gpu.arguments["trainer_hyperparams"]["callbacks"] = train_request_HamS_gpu.arguments["trainer_hyperparams"]["callbacks"][:-1] \
+    + [ModelCheckpoint(save_top_k=3, save_last=True, monitor="val/artificial/hamiltonian_cycle")]
 
 # # Training on genomic data
 # import hamgnn.data.genomic_datasets as genomic_datasets
