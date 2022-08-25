@@ -44,7 +44,7 @@ if __name__ == "__main__":
             model = None
 
 
-    if wandb_run is None:
+    if wandb_run is None or model is None:
         print(f"Could not identify model through '{identifier}'")
         exit(-2)
     else:

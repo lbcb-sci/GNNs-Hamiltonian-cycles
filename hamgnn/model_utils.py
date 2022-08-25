@@ -104,6 +104,7 @@ def create_model_from_checkpoint(checkpoint_path):
     for c in model_classes:
         try:
             model = c.load_from_checkpoint(checkpoint_path)
+            break
         except:
             pass
     return model
