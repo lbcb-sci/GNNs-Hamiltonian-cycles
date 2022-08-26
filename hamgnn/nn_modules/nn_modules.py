@@ -102,3 +102,16 @@ class MultilayerGatedGCN(torch.nn.Module):
         for l in self.layers:
             x, e_hat = l(x, edge_index, e_hat)
         return x, e_hat
+
+# Adding layer normalization
+
+class ResidualMultilayerMPNNLayerNorm(ResidualMultilayerMPNN):
+    def construct_message_nn(self):
+        net = super().construct_message_nn()
+        net.append(torch_g.nn.norm.LayerNorm(self.message_dim))
+        return net
+
+    def construct_main_nn(self):
+        net = super().construct_main_nn()
+        net.append(torch_g.nn.norm.LayerNorm(self.in_dim))
+        return net
