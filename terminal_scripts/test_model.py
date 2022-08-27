@@ -21,9 +21,6 @@ if __name__ == "__main__":
             model = model_utils.create_model_from_checkpoint(checkpoint_path)
             if model is None:
                 print(f"Failed to create model from {checkpoint_path}. Appropriate model classes seem to be missing.")
-            else:
-                wandb_run = wandb.init(project=wandb_project, resume=False, name=f"{checkpoint_path.name}")
-
         except Exception as ex:
             if wandb_run is not None:
                 wandb_run.finish()
