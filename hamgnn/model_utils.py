@@ -123,7 +123,9 @@ def create_model_for_wandb_run(wandb_run, checkpoint_path=None):
         try:
             with tempfile.TemporaryDirectory() as tmp_dir:
                 artifact = wandb_run.use_artifact(f"model-{wandb_run.id}:v0")
-                checkpoint_path = Path(artifact.download(tmp_dir))
+                artifact.download(tmp_dir)
+                # Hacky solution. W&B documentation is not very clear on how these artifcats should be used
+                checkpoint_path = Path(tmp_dir) / "model.ckpt"
                 model = create_model_from_checkpoint(checkpoint_path)
         except Exception as ex:
             model = None
