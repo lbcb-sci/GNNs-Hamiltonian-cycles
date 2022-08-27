@@ -19,8 +19,9 @@ import hamgnn.Evaluation as Evaluation
 
 def list_of_gnn_model_classes():
     model_classes = []
+    parent_module_name = ".".join(__name__.split(".")[:-1])
     for (_, module_name, _) in pkgutil.iter_modules([Path(__file__).resolve().parent]):
-        module = importlib.import_module(f"{__name__}.{module_name}")
+        module = importlib.import_module(f"{parent_module_name}.{module_name}")
         model_classes.extend([var for var_name, var in vars(module).items() if isclass(var) and issubclass(var, HamFinderGNN)])
     return model_classes
 
