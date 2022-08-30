@@ -173,12 +173,18 @@ train_request_HamS_gpu.arguments["trainer_hyperparams"].update({
     "gpus": [0]
 })
 train_request_HamS_gpu.arguments["datamodule_hyperparams"].update({"train_batch_size": 16, "val_batch_size": 8})
-train_request_HamS_gpu.arguments["trainer_hyperparams"].update({"max_epochs": 200})
+# train_request_HamS_gpu.arguments["trainer_hyperparams"].update({"max_epochs": 200})
 train_request_HamS_gpu.arguments["trainer_hyperparams"]["callbacks"] = train_request_HamS_gpu.arguments["trainer_hyperparams"]["callbacks"][:-1] \
     + [ModelCheckpoint(save_top_k=3, save_last=True, monitor="val/artificial/hamiltonian_cycle")]
 
 train_request_HamS_gpu_layer_norm = copy.deepcopy(train_request_HamS_gpu)
 train_request_HamS_gpu_layer_norm.arguments["model_class"] = EncodeProcessDecodeWithLayerNorm.EncodeProcessDecodeWithLayerNorm
+
+train_request_HamS_gpu_large = copy.deepcopy(train_request_HamS_gpu_layer_norm)
+train_request_HamS_gpu_large.arguments["model_hyperparams"].update(
+    {"processor_depth": 10,
+    "hidden_dim": 256}
+)
 
 # # Training on genomic data
 # import hamgnn.data.genomic_datasets as genomic_datasets
