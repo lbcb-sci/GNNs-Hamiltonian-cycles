@@ -181,10 +181,16 @@ train_request_HamS_gpu_layer_norm = copy.deepcopy(train_request_HamS_gpu)
 train_request_HamS_gpu_layer_norm.arguments["model_class"] = EncodeProcessDecodeWithLayerNorm.EncodeProcessDecodeWithLayerNorm
 
 train_request_HamS_gpu_large = copy.deepcopy(train_request_HamS_gpu_layer_norm)
+train_request_HamS_gpu.arguments["trainer_hyperparams"].update({"max_epochs": 400})
 train_request_HamS_gpu_large.arguments["model_hyperparams"].update(
-    {"processor_depth": 10,
-    "hidden_dim": 256}
+    {"processor_depth": 7,
+    "hidden_dim": 128}
 )
+
+train_request_HamS_gpu_large_size_50 = copy.deepcopy(train_request_HamS_gpu_large)
+train_request_HamS_gpu_large_size_50.arguments["datamodule_hyperparams"].update({
+    "train_graph_size": 50
+})
 
 # # Training on genomic data
 # import hamgnn.data.genomic_datasets as genomic_datasets
