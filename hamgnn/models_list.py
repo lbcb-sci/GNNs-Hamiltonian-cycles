@@ -42,7 +42,7 @@ train_request_HamS = model_utils.ModelTrainRequest(
         "train_batch_size": 8,
         "val_batch_size": 8,
         "train_graph_size": 25,
-        "train_expected_noise_edges_per_node": 4,
+        "train_expected_noise_edges_per_node": 3,
         "val_hamiltonian_existence_probability": 0.8,
     },
     model_checkpoint_hyperparams = {
