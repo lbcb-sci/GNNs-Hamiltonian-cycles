@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import torch_geometric as torch_g
 import torch_scatter
 
@@ -115,3 +116,17 @@ class ResidualMultilayerMPNNLayerNorm(ResidualMultilayerMPNN):
         net = super().construct_main_nn()
         net.append(torch_g.nn.norm.LayerNorm(self.in_dim))
         return net
+
+class RandomFeaturesWrapper(torch.nn.Module):
+    def __init__(self, graph_gnn, random_features_dim):
+        super().__init__()
+        self.random_features_dim = random_features_dim
+        self.graph_gnn = graph_gnn
+
+    def forward(self, x, *args, **kwargs):
+        rand_shape = list(x.shape[:-1])
+        rand_shape.append(self.random_features_dim)
+        rand_features = torch.randn(rand_shape, device=x.device, dtype=x.dtype)
+        rand_features = F.normalize(rand_features)
+        x_enhanced = torch.cat([x, rand_features], dim=-1)
+        return self.graph_gnn.forward(x_enhanced, *args, **kwargs)
