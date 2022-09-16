@@ -8,6 +8,7 @@ from hamgnn.nn_modules.EncodeProcessDecodeNN import EncodeProcessDecodeAlgorithm
 from hamgnn.nn_modules.EncodeProcessDecodeNoHiddenNN import _EncodeProcessDecodeNoHidden
 from hamgnn.nn_modules.EmbeddingAndMaxMPNN import EmbeddingAndMaxMPNN
 import hamgnn.nn_modules.EncodeProcessDecodeWithLayerNorm as EncodeProcessDecodeWithLayerNorm
+from hamgnn.nn_modules.EncodeProcessDecodeRandFeatures import EncodeProcessDecodeRandFeatures
 import hamgnn.data.DataModules as DataModules
 import hamgnn.model_utils as model_utils
 import hamgnn.callbacks as my_callbacks
@@ -173,7 +174,6 @@ train_request_HamS_gpu.arguments["trainer_hyperparams"].update({
     "gpus": [0]
 })
 train_request_HamS_gpu.arguments["datamodule_hyperparams"].update({"train_batch_size": 16, "val_batch_size": 8})
-# train_request_HamS_gpu.arguments["trainer_hyperparams"].update({"max_epochs": 200})
 train_request_HamS_gpu.arguments["trainer_hyperparams"]["callbacks"] = train_request_HamS_gpu.arguments["trainer_hyperparams"]["callbacks"][:-1] \
     + [ModelCheckpoint(save_top_k=3, save_last=True, monitor="val/artificial/hamiltonian_cycle")]
 
@@ -181,7 +181,7 @@ train_request_HamS_gpu_layer_norm = copy.deepcopy(train_request_HamS_gpu)
 train_request_HamS_gpu_layer_norm.arguments["model_class"] = EncodeProcessDecodeWithLayerNorm.EncodeProcessDecodeWithLayerNorm
 
 train_request_HamS_gpu_large = copy.deepcopy(train_request_HamS_gpu_layer_norm)
-train_request_HamS_gpu.arguments["trainer_hyperparams"].update({"max_epochs": 400})
+train_request_HamS_gpu.arguments["trainer_hyperparams"].update({"max_epochs": 2000})
 train_request_HamS_gpu_large.arguments["model_hyperparams"].update(
     {"processor_depth": 7,
     "hidden_dim": 128}
@@ -191,6 +191,9 @@ train_request_HamS_gpu_large_size_50 = copy.deepcopy(train_request_HamS_gpu_larg
 train_request_HamS_gpu_large_size_50.arguments["datamodule_hyperparams"].update({
     "train_graph_size": 50
 })
+
+train_request_HamS_gpu_with_rand_node_encoding = copy.deepcopy(train_request_HamS_gpu)
+train_request_HamS_gpu_with_rand_node_encoding.arguments["model_class"] = EncodeProcessDecodeRandFeatures
 
 # # Training on genomic data
 # import hamgnn.data.genomic_datasets as genomic_datasets
