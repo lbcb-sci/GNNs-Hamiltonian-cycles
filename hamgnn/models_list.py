@@ -192,8 +192,14 @@ train_request_HamS_gpu_large_size_50.arguments["datamodule_hyperparams"].update(
     "train_graph_size": 50
 })
 
+# GNN operations include random features
 train_request_HamS_gpu_with_rand_node_encoding = copy.deepcopy(train_request_HamS_gpu)
 train_request_HamS_gpu_with_rand_node_encoding.arguments["model_class"] = EncodeProcessDecodeRandFeatures
+
+# Improved environment input embedding
+from hamgnn.nn_modules.EncodeProcessDecodeAdvancedPositionalEmbedding import EncodeProcessDecodeAdvancedPositionalEmbedding
+train_request_HamS_gpu_advanced_input = copy.deepcopy(train_request_HamS_gpu)
+train_request_HamS_gpu_advanced_input.arguments["model_class"] = EncodeProcessDecodeAdvancedPositionalEmbedding
 
 # # Training on genomic data
 # import hamgnn.data.genomic_datasets as genomic_datasets
