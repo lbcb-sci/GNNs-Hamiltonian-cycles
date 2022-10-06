@@ -43,7 +43,7 @@ class EvaluationScores:
     @staticmethod
     def evaluate(graphs: list[torch_g.data.Data], solutions: list[int]):
         is_valid = numpy.array([EvaluationScores.is_walk_valid(graph, walk) for graph, walk in zip(graphs, solutions)])
-        is_cycle = numpy.array([len(walk) > 0 and walk[0] == walk[-1] for walk in solutions])
+        is_cycle = numpy.array([len(walk) > 0 and walk[0] == walk[-1] for walk in solutions]) & is_valid
         nr_unique_nodes = [len(set(walk)) for walk in solutions]
         sizes = [graph.num_nodes for graph in graphs]
 
@@ -59,7 +59,7 @@ class EvaluationScores:
     @staticmethod
     def compute_scores(evals):
         df = pandas.DataFrame.from_dict(evals)
-        df["is_ham_cycle"] = (df["length"] == df["size"]) & (df["is_cycle"])
+        df["is_ham_cycle"] = (df["length"] == df["size"]) & (df["is_cycle"]) & df["is_valid"]
         df["is_ham_path"] = (df["length"] == df["size"]) & (~df["is_cycle"]) & df["is_valid"]
         df["is_approx_ham_cycle"] \
             = (df["length"] > EvaluationScores.APPROXIMATE_HAMILTON_LOWER_BOUND * df["size"]) & (df["is_cycle"])
