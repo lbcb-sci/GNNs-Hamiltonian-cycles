@@ -7,8 +7,9 @@ from pytorch_lightning.callbacks import LearningRateMonitor, ModelCheckpoint
 from hamgnn.nn_modules.EncodeProcessDecodeNN import EncodeProcessDecodeAlgorithm
 from hamgnn.nn_modules.EncodeProcessDecodeNoHiddenNN import _EncodeProcessDecodeNoHidden
 from hamgnn.nn_modules.EmbeddingAndMaxMPNN import EmbeddingAndMaxMPNN
+import hamgnn.nn_modules.EncodeProcessDecodeWithLayerNorm as EncodeProcessDecodeWithLayerNorm
+from hamgnn.nn_modules.EncodeProcessDecodeRandFeatures import EncodeProcessDecodeRandFeatures
 import hamgnn.data.DataModules as DataModules
-import hamgnn.data.genomic_datasets as genomic_datasets
 import hamgnn.model_utils as model_utils
 import hamgnn.callbacks as my_callbacks
 
@@ -42,7 +43,7 @@ train_request_HamS = model_utils.ModelTrainRequest(
         "train_batch_size": 8,
         "val_batch_size": 8,
         "train_graph_size": 25,
-        "train_expected_noise_edges_per_node": 4,
+        "train_expected_noise_edges_per_node": 3,
         "val_hamiltonian_existence_probability": 0.8,
     },
     model_checkpoint_hyperparams = {
@@ -134,26 +135,6 @@ train_request_HamS200_no_hidden = copy.deepcopy(train_request_HamS_no_hidden)
 train_request_HamS200_no_hidden.arguments["datamodule_hyperparams"]["train_graph_size"] = 200
 
 
-data_root_folder = (Path(__file__).parent / "../genome_graphs/SnakemakePipeline").resolve()
-train_request_HamS_genomes = copy.deepcopy(train_request_HamS)
-train_request_HamS_genomes.arguments["model_hyperparams"].update({
-    "val_dataloader_tags": None,
-    "loss_type": "mse"
-})
-train_request_HamS_genomes.arguments["datamodule_class"] = genomic_datasets.StringGraphDatamodule
-train_request_HamS_genomes.arguments["datamodule_hyperparams"] = {
-    "train_batch_size": 1,
-    "val_batch_size": 1,
-    "train_paths": (data_root_folder / "string_graphs_train.txt").read_text().split(),
-    "val_paths": (data_root_folder / "string_graphs_val.txt").read_text().split(),
-    "test_paths": (data_root_folder / "string_graphs_test.txt").read_text().split()
-}
-train_request_HamS_genomes.arguments["trainer_hyperparams"]["callbacks"] = lr_callbacks + norm_monitoring_callbacks + [ModelCheckpoint(save_top_k=3, save_last=True, monitor="val/hamiltonian_cycle")]
-
-train_request_HamS_genomes_lr = copy.deepcopy(train_request_HamS_genomes)
-train_request_HamS_genomes_lr.arguments["model_hyperparams"]["starting_learning_rate"] = 1e-7
-
-
 train_request_HamS_rare_artificial_cycle = copy.deepcopy(train_request_HamS)
 train_request_HamS_rare_artificial_cycle.arguments["datamodule_class"] = DataModules.ArtificialCycleDataModule
 train_request_HamS_rare_artificial_cycle.arguments["datamodule_hyperparams"] = {
@@ -183,6 +164,65 @@ train_request_HamS_rare_really_small.arguments["datamodule_hyperparams"].update(
     "train_expected_noise_edges_per_node": 0.07,
     "val_expected_noise_edges_per_node": 0.07
 })
+
+# GPU training
+train_request_HamS_gpu = copy.deepcopy(train_request_HamS)
+train_request_HamS_gpu.arguments["datamodule_class"] = DataModules.ArtificialCycleDataModule
+del train_request_HamS_gpu.arguments["datamodule_hyperparams"]["val_hamiltonian_existence_probability"]
+train_request_HamS_gpu.arguments["model_hyperparams"]["val_dataloader_tags"] = ["artificial"]
+train_request_HamS_gpu.arguments["trainer_hyperparams"].update({
+    "gpus": [0]
+})
+train_request_HamS_gpu.arguments["datamodule_hyperparams"].update({"train_batch_size": 16, "val_batch_size": 8})
+train_request_HamS_gpu.arguments["trainer_hyperparams"]["callbacks"] = train_request_HamS_gpu.arguments["trainer_hyperparams"]["callbacks"][:-1] \
+    + [ModelCheckpoint(save_top_k=3, save_last=True, monitor="val/artificial/hamiltonian_cycle")]
+
+train_request_HamS_gpu_layer_norm = copy.deepcopy(train_request_HamS_gpu)
+train_request_HamS_gpu_layer_norm.arguments["model_class"] = EncodeProcessDecodeWithLayerNorm.EncodeProcessDecodeWithLayerNorm
+
+train_request_HamS_gpu_large = copy.deepcopy(train_request_HamS_gpu_layer_norm)
+train_request_HamS_gpu.arguments["trainer_hyperparams"].update({"max_epochs": 2000})
+train_request_HamS_gpu_large.arguments["model_hyperparams"].update(
+    {"processor_depth": 7,
+    "hidden_dim": 128}
+)
+
+train_request_HamS_gpu_large_size_50 = copy.deepcopy(train_request_HamS_gpu_large)
+train_request_HamS_gpu_large_size_50.arguments["datamodule_hyperparams"].update({
+    "train_graph_size": 50
+})
+
+# GNN operations include random features
+train_request_HamS_gpu_with_rand_node_encoding = copy.deepcopy(train_request_HamS_gpu)
+train_request_HamS_gpu_with_rand_node_encoding.arguments["model_class"] = EncodeProcessDecodeRandFeatures
+
+# Improved environment input embedding
+from hamgnn.nn_modules.EncodeProcessDecodeAdvancedPositionalEmbedding import EncodeProcessDecodeAdvancedPositionalEmbedding
+train_request_HamS_gpu_advanced_input = copy.deepcopy(train_request_HamS_gpu)
+train_request_HamS_gpu_advanced_input.arguments["model_class"] = EncodeProcessDecodeAdvancedPositionalEmbedding
+
+# # Training on genomic data
+# import hamgnn.data.genomic_datasets as genomic_datasets
+# data_root_folder = (Path(__file__).parent / "../genome_graphs/SnakemakePipeline").resolve()
+# train_request_HamS_genomes = copy.deepcopy(train_request_HamS)
+# train_request_HamS_genomes.arguments["model_hyperparams"].update({
+#     "val_dataloader_tags": None,
+#     "loss_type": "mse"
+# })
+# train_request_HamS_genomes.arguments["datamodule_class"] = genomic_datasets.StringGraphDatamodule
+# train_request_HamS_genomes.arguments["datamodule_hyperparams"] = {
+#     "train_batch_size": 1,
+#     "val_batch_size": 1,
+#     "train_paths": (data_root_folder / "string_graphs_train.txt").read_text().split(),
+#     "val_paths": (data_root_folder / "string_graphs_val.txt").read_text().split(),
+#     "test_paths": (data_root_folder / "string_graphs_test.txt").read_text().split()
+# }
+# train_request_HamS_genomes.arguments["trainer_hyperparams"]["callbacks"] = lr_callbacks + norm_monitoring_callbacks + [ModelCheckpoint(save_top_k=3, save_last=True, monitor="val/hamiltonian_cycle")]
+
+# train_request_HamS_genomes_lr = copy.deepcopy(train_request_HamS_genomes)
+# train_request_HamS_genomes_lr.arguments["model_hyperparams"]["starting_learning_rate"] = 1e-7
+
+
 
 ### Reinforcement learning models
 

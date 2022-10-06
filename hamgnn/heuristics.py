@@ -4,7 +4,7 @@ import networkx as nx
 import torch
 from copy import deepcopy
 
-from hamgnn.Models import HamiltonSolver
+from hamgnn.HamiltonSolver import HamiltonSolver
 
 def _to_networkit(num_nodes, edge_index: torch.tensor):
     g = networkit.Graph(num_nodes)

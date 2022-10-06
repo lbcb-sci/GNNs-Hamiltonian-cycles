@@ -6,13 +6,13 @@ from hamgnn.data.GraphDataset import FilterSolvableGraphsGeneratingDataset, Grap
 from hamgnn.data.GraphGenerators import ErdosRenyiExamplesGenerator, ErdosRenyiGenerator, NoisyCycleGenerator
 
 
-LIGHTNING_MODULE_REFERENCE = "lightning_module_reference"
+LIGHTNING_MODULE_REFERENCE_KEYWORD = "lightning_module_reference"
 
 
 class BaseGraphGeneratingDataModule(torch_lightning.LightningDataModule):
     def __init__(self, train_graph_size=25, train_batch_size=8, train_virtual_epoch_size=2000, val_graph_size=None, val_batch_size=None,
                  val_virtual_epoch_size=None, *args, **kwargs):
-        self.__lightnig_module_reference =  kwargs.pop(LIGHTNING_MODULE_REFERENCE)
+        self.__lightnig_module_reference =  kwargs.pop(LIGHTNING_MODULE_REFERENCE_KEYWORD)
         self.train_graph_size = train_graph_size
         self.train_batch_size = train_batch_size
         self.train_virtual_epoch_size = train_virtual_epoch_size
@@ -72,10 +72,10 @@ class ArtificialCycleWithDoubleEvaluationDataModule(ArtificialCycleDataModule):
         return super().setup(stage)
 
     def val_dataloader(self):
-        dataloader_like_train = super().val_dataloader()
-        generator_like_test = ErdosRenyiExamplesGenerator(self.val_graph_size, self.val_hamiltonian_existence_probabilty)
-        dataloader_like_test = GraphDataLoader(FilterSolvableGraphsGeneratingDataset(generator_like_test, self.val_virtual_epoch_size), batch_size=self.val_batch_size)
-        return dataloader_like_train, dataloader_like_test
+        artificial_cycle_dataloader = super().val_dataloader()
+        er_generator = ErdosRenyiExamplesGenerator(self.val_graph_size, self.val_hamiltonian_existence_probabilty)
+        er_dataloader = GraphDataLoader(FilterSolvableGraphsGeneratingDataset(er_generator, self.val_virtual_epoch_size), batch_size=self.val_batch_size)
+        return artificial_cycle_dataloader, er_dataloader
 
 
 class SolvedErdosRenyiDataModule(TestWithLocalDatasetDataModule):
@@ -103,7 +103,7 @@ class ReinforcementErdosRenyiDataModule(TestWithLocalDatasetDataModule):
     def __init__(self, train_ham_existence_prob=0.8, val_ham_existence_prob=None, train_nr_simultaneous_simulations=4,
                  val_nr_simultaneous_simulations=1, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.simulation_module = kwargs[LIGHTNING_MODULE_REFERENCE]
+        self.simulation_module = kwargs[LIGHTNING_MODULE_REFERENCE_KEYWORD]
         self.train_ham_existence_prob = train_ham_existence_prob
         self.val_ham_existence_prob = val_ham_existence_prob if val_ham_existence_prob else self.train_ham_existence_prob
         self.train_nr_simultaneous_simulations = train_nr_simultaneous_simulations

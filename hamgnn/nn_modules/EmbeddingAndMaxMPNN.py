@@ -12,7 +12,7 @@ import hamgnn.nn_modules.hamilton_gnn_utils as gnn_utils
 class EmbeddingAndMaxMPNN(gnn_utils.HamCycleFinderWithValueFunction):
     def _construct_embedding(self):
         embedding = ResidualMultilayerMPNN(self.hidden_dim, self.hidden_dim, 1, nr_layers=self.embedding_depth)
-        embedding_out_projection = torch.nn.Linear(self.hidden_dim, self.hidden_dim - 3)
+        embedding_out_projection = torch.nn.Linear(self.hidden_dim, self.hidden_dim - self.in_dim)
         return embedding, embedding_out_projection
 
     def _construct_processor(self):
@@ -36,7 +36,7 @@ class EmbeddingAndMaxMPNN(gnn_utils.HamCycleFinderWithValueFunction):
         self.out_dim = out_dim
         self.embedding_depth = embedding_depth
         self.processor_depth = processor_depth
-        assert hidden_dim > 3
+        assert hidden_dim > self.in_dim
         self.hidden_dim = hidden_dim
         self.softmax = torch.nn.Softmax(dim=0)
         self.initial_embedding = torch.nn.Parameter(torch.rand([hidden_dim], requires_grad=True))

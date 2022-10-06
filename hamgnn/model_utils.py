@@ -48,12 +48,13 @@ def train_model(model_class, datamodule_class, model_checkpoint=None, model_hype
     wandb_logger.experiment.summary["description"] = model.description()
 
     datamodule_hyperparams.update({
-        DataModules.LIGHTNING_MODULE_REFERENCE: model,
+        DataModules.LIGHTNING_MODULE_REFERENCE_KEYWORD: model,
     })
     datamodule = datamodule_class(**datamodule_hyperparams)
 
     trainer_hyperparams.update({
-        "logger": wandb_logger
+        "logger": wandb_logger,
+        "default_root_dir": Path(constants.MODEL_CHECKPOINT_SAVING_DIRECTORY).resolve()
     })
 
     model_checkpoint_hyperparams["save_last"] = True
@@ -104,6 +105,7 @@ def create_model_from_checkpoint(checkpoint_path):
     for c in model_classes:
         try:
             model = c.load_from_checkpoint(checkpoint_path)
+            break
         except:
             pass
     return model
@@ -122,7 +124,9 @@ def create_model_for_wandb_run(wandb_run, checkpoint_path=None):
         try:
             with tempfile.TemporaryDirectory() as tmp_dir:
                 artifact = wandb_run.use_artifact(f"model-{wandb_run.id}:v0")
-                checkpoint_path = Path(artifact.download(tmp_dir))
+                artifact.download(tmp_dir)
+                # Hacky solution. W&B documentation is not very clear on how these artifcats should be used
+                checkpoint_path = Path(tmp_dir) / "model.ckpt"
                 model = create_model_from_checkpoint(checkpoint_path)
         except Exception as ex:
             model = None
@@ -158,16 +162,15 @@ def load_existing_model(model_identifier, wandb_project=constants.WEIGHTS_AND_BI
     return None, "Failed"
 
 
-def test_on_saved_data(model: HamiltonSolver, wandb_run=None):
+def test_on_saved_data(model: HamiltonSolver, wandb_run=None, store_tag=constants.DEFAULT_FINAL_TEST_TAG):
     df_testing_results = EvaluationScores.accuracy_scores_on_saved_data([model], ["model"], nr_graphs_per_size=None, is_show_progress=True)
-    unified_test_tag = "fixed_ER_saved"
 
     if wandb_run is not None:
         for row_index, row in df_testing_results.iterrows():
             for accuracy_tag in [EvaluationScores.ACCURACY_SCORE_TAGS.perc_hamilton_found, EvaluationScores.ACCURACY_SCORE_TAGS.perc_long_cycles_found,
                                 EvaluationScores.ACCURACY_SCORE_TAGS.perc_full_walks_found, EvaluationScores.ACCURACY_SCORE_TAGS.perc_long_walks_found,
                                 EvaluationScores.ACCURACY_SCORE_TAGS.avg_execution_time]:
-                wandb_run.log({f"{unified_test_tag}/graph_size": row["graph size"], f"{unified_test_tag}/{accuracy_tag}": row[accuracy_tag]})
+                wandb_run.log({f"{store_tag}/graph_size": row["graph size"], f"{store_tag}/{accuracy_tag}": row[accuracy_tag]})
     return df_testing_results
 
 

@@ -19,8 +19,9 @@ import hamgnn.Evaluation as Evaluation
 
 def list_of_gnn_model_classes():
     model_classes = []
+    parent_module_name = ".".join(__name__.split(".")[:-1])
     for (_, module_name, _) in pkgutil.iter_modules([Path(__file__).resolve().parent]):
-        module = importlib.import_module(f"{__name__}.{module_name}")
+        module = importlib.import_module(f"{parent_module_name}.{module_name}")
         model_classes.extend([var for var_name, var in vars(module).items() if isclass(var) and issubclass(var, HamFinderGNN)])
     return model_classes
 
@@ -98,7 +99,7 @@ class HamFinderGNN(HamiltonSolver, torch_lightning.LightningModule):
         choice = torch.argmax(
             torch.isclose(p, torch.max(p, dim=-1)[0][..., None])
             * (p + torch.randperm(p.shape[-1], device=p.device)[None, ...]), dim=-1)
-        choice += torch.tensor(list(itertools.accumulate(graph_sizes[:-1], initial=0)))
+        choice += torch.tensor(list(itertools.accumulate(graph_sizes[:-1], initial=0)), device=choice.device, dtype=choice.dtype)
 
         return p, choice
 
@@ -167,7 +168,7 @@ class HamFinderGNN(HamiltonSolver, torch_lightning.LightningModule):
 
     @staticmethod
     def _convert_batch_walk_tensor_into_solution_list(batch_walks_tensor, graphs_shift_inside_batch):
-        batch_walks_tensor -= graphs_shift_inside_batch[:, None]
+        batch_walks_tensor -= torch.from_numpy(graphs_shift_inside_batch[:, None]).to(batch_walks_tensor.device)
         batch_walks_tensor[batch_walks_tensor < 0] = -1
         raw_walks = [[int(node.item()) for node in walk] for walk in batch_walks_tensor]
         walks = []
