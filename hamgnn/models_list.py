@@ -201,6 +201,17 @@ from hamgnn.nn_modules.EncodeProcessDecodeAdvancedPositionalEmbedding import Enc
 train_request_HamS_gpu_advanced_input = copy.deepcopy(train_request_HamS_gpu)
 train_request_HamS_gpu_advanced_input.arguments["model_class"] = EncodeProcessDecodeAdvancedPositionalEmbedding
 
+# Testing batch size
+train_request_HamS_gpu_large_batch = copy.deepcopy(train_request_HamS_gpu)
+train_request_HamS_gpu_large_batch.arguments["datamodule_hyperparams"].update({
+    "train_batch_size": 64
+})
+train_request_HamS_gpu.arguments["trainer_hyperparams"].update({
+    "gpus": [0]
+})
+
+
+
 # # Training on genomic data
 # import hamgnn.data.genomic_datasets as genomic_datasets
 # data_root_folder = (Path(__file__).parent / "../genome_graphs/SnakemakePipeline").resolve()
