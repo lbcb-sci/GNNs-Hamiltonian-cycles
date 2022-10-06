@@ -7,6 +7,7 @@ from typing import List
 import copy
 import time
 import threading
+from pathlib import Path
 import warnings
 
 import torch
@@ -18,11 +19,20 @@ from hamgnn.constants import CONCORDE_SCRIPT_PATH, CONCORDE_WORK_DIR, CONCORDE_I
 
 class ConcordeHamiltonSolver(HamiltonSolver):
     def __init__(self, root_dir=CONCORDE_WORK_DIR, working_subdir=None):
-        self.CONCORDE_EXECUTABLE_PATH = CONCORDE_SCRIPT_PATH
+        self.CONCORDE_EXECUTABLE_FILEPATH_STRING = str(Path(CONCORDE_SCRIPT_PATH).resolve())
+        self._check_concorde_installed()
         if working_subdir is None:
             working_subdir = f"thread-{threading.get_ident()}_time-{time.time_ns()}"
         self.working_dir = os.path.join(root_dir, working_subdir)
+        self.init_work_folder()
         self.CONCORDE_INPUT_FILE = CONCORDE_INPUT_FILE
+
+    def _check_concorde_installed(self):
+        assert Path(self.CONCORDE_EXECUTABLE_FILEPATH_STRING).exists(), f"Failed to find concorde executable {self.CONCORDE_EXECUTABLE_FILEPATH_STRING}"
+        called_process = subprocess.run([self.CONCORDE_EXECUTABLE_FILEPATH_STRING, "--help"], capture_output=True)
+        string_stdout, string_stderr = [
+            out_stream.decode("utf-8") for out_stream in [called_process.stdout, called_process.stderr]]
+        assert string_stderr.startswith("Usage"), f"Failed to run concorde executable, running '{self.CONCORDE_EXECUTABLE_FILEPATH_STRING} --help' returned '{string_stderr}'"
 
     def init_work_folder(self):
         if not os.path.isdir(self.working_dir):
@@ -45,7 +55,6 @@ class ConcordeHamiltonSolver(HamiltonSolver):
         adjacency = adjacency.to_dense()
         weights = 2*torch.ones_like(adjacency) - adjacency
         weights_str = ''.join([''.join([str(x.item()) + " " for x in weights[i]] + ['\n']) for i in range(d.num_nodes)])
-        self.init_work_folder()
         out_string = textwrap.dedent(
             """
             NAME: {}
@@ -59,15 +68,15 @@ class ConcordeHamiltonSolver(HamiltonSolver):
         with open(filepath, "w") as out:
             out.write(out_string)
 
-    # INPUT FILE CREATION TAKES A LONG TIME (QUADRATIC COMPLEXITY) SO THE RESULTS CAN BE UNINTUITIVE!
     def time_execution(self, d: torch_g.data.Data, input_file=None, is_consume_input_file=False):
-        # TODO NEED TO CHECK IF CONCORDE IS PROPERLY INSTALLED!
+        """ Writing adjacency matrix into concorde input file (quadratic complexity) is not counted included in execution time. Because of it, the reported runtime
+         will be shorter than the time this function takes to execute"""
         if input_file is None:
             self.create_input_file(d)
             is_consume_input_file=True
             input_file = os.path.join(self.working_dir, self.CONCORDE_INPUT_FILE)
         input_file = os.path.abspath(input_file)
-        called_process = subprocess.run(["time", self.CONCORDE_EXECUTABLE_PATH, input_file],
+        called_process = subprocess.run(["time", self.CONCORDE_EXECUTABLE_FILEPATH_STRING, input_file],
                                         cwd=self.working_dir, capture_output=True)
         string_stdout, string_stderr = [
             out_stream.decode("utf-8") for out_stream in [called_process.stdout, called_process.stderr]]
