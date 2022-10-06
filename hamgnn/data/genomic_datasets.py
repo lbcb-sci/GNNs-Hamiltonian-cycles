@@ -3,7 +3,7 @@ import torch
 import torch_geometric as torch_g
 import pytorch_lightning as torch_lightning
 
-from hamgnn.data.DataModules import LIGHTNING_MODULE_REFERENCE
+from hamgnn.data.DataModules import LIGHTNING_MODULE_REFERENCE_KEYWORD
 from hamgnn.data.GraphDataset import GraphExample, GraphDataLoader
 from OlcGraph import OlcGraph
 import olc_graph_tools
@@ -71,7 +71,7 @@ class StringGraphDatamodule(torch_lightning.LightningDataModule):
         self.train_batch_size = train_batch_size
         self.val_batch_size = val_batch_size
         self.test_batch_size = test_batch_size
-        kwargs.pop(LIGHTNING_MODULE_REFERENCE)
+        kwargs.pop(LIGHTNING_MODULE_REFERENCE_KEYWORD)
         super().__init__(*args, **kwargs)
 
     def prepare_data(self) -> None:

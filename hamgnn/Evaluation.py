@@ -1,4 +1,3 @@
-import matplotlib.pyplot as plt
 import pandas
 import numpy
 from typing import List
@@ -20,7 +19,6 @@ class EvaluationScores:
         perc_full_walks_found = "perc_full_walks_found"
         perc_long_walks_found = "perc_long_walks_found"
         avg_execution_time = "avg_execution_time"
-
 
     APPROXIMATE_HAMILTON_LOWER_BOUND = 0.9
 

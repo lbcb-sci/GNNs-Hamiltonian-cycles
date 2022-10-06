@@ -1,4 +1,3 @@
-import os
 import pickle
 import itertools
 from typing import List
@@ -31,22 +30,11 @@ class ErdosRenyiInMemoryDataset(torch.utils.data.Dataset):
     STORAGE_HAMILTON_EXISTENCE_PROB = "hamiltonian_cycle_probability"
 
     class Transforms:
-        pass
         @staticmethod
         def graph_and_hamilton_cycle(item):
             graph = item[ErdosRenyiInMemoryDataset.STORAGE_EDGE_INDEX_TAG]
             cycle = torch.tensor(item[ErdosRenyiInMemoryDataset.STORAGE_HAMILTONIAN_CYCLE_TAG])
             return GraphDataset.GraphExample(graph, cycle)
-
-    # @staticmethod
-    # def _raw_to_storage_dict(graph, hamiltonian_cycle, hamilton_existence_prob=-1):
-    #     edge_index = graph.edge_index
-    #     edge_index_list = [list(edge_index[i]) for i in range(2)]
-    #     storage_dict = {ErdosRenyiInMemoryDataset.STORAGE_EDGE_INDEX_TAG: edge_index_list,
-    #             ErdosRenyiInMemoryDataset.STORAGE_NUM_NODES_TAG: graph.num_nodes,
-    #             ErdosRenyiInMemoryDataset.STORAGE_HAMILTON_EXISTENCE_PROB: hamilton_existence_prob,
-    #             ErdosRenyiInMemoryDataset.STORAGE_HAMILTON_CYCLE_TAG: hamiltonian_cycle}
-    #     return storage_dict
 
     @staticmethod
     def to_storage_dict(graph_examples: List[ErdosRenyiGraphExample]):

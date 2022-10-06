@@ -3,7 +3,6 @@ import numpy
 import torch_geometric as torch_g
 import torch
 import itertools
-import pandas
 from typing import List, Iterator
 from abc import ABC, abstractmethod
 
@@ -21,11 +20,11 @@ def _generate_ERmk_model_edge_index_for_small_k(num_nodes, num_edges):
     if _edge_fraction > 1/2:
         print(f"Using inefficient method (ment for sparse graph with edge fraction << 1) for Erdos-Renyi graph with edge fraction {_edge_fraction}")
     original_dtype = numpy.int64
-    _generation_overhead = 0.1
+    _generation_overhead_fraction = 0.1
 
     edges = set()
     while len(edges) < num_edges:
-        points_to_generate = num_edges + int(num_edges * _generation_overhead)
+        points_to_generate = num_edges + int(num_edges * _generation_overhead_fraction)
         generated_edges = numpy.random.randint(0, num_nodes, size=[points_to_generate, 2],
                                                dtype=original_dtype)
         generated_edges = generated_edges[generated_edges[:, 0] < generated_edges[:, 1]]

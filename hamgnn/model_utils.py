@@ -48,12 +48,13 @@ def train_model(model_class, datamodule_class, model_checkpoint=None, model_hype
     wandb_logger.experiment.summary["description"] = model.description()
 
     datamodule_hyperparams.update({
-        DataModules.LIGHTNING_MODULE_REFERENCE: model,
+        DataModules.LIGHTNING_MODULE_REFERENCE_KEYWORD: model,
     })
     datamodule = datamodule_class(**datamodule_hyperparams)
 
     trainer_hyperparams.update({
-        "logger": wandb_logger
+        "logger": wandb_logger,
+        "default_root_dir": Path(constants.MODEL_CHECKPOINT_SAVING_DIRECTORY).resolve()
     })
 
     model_checkpoint_hyperparams["save_last"] = True
