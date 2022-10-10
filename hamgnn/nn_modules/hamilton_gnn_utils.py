@@ -191,6 +191,7 @@ class HamFinderGNN(HamiltonSolver, torch_lightning.LightningModule):
         return batch_graph, teacher_paths
 
     def solve_batch_graph(self, batch_graph, subgraph_sizes=None):
+        batch_graph.to(self.device)
         if subgraph_sizes is None:
             subgraph_sizes = [g.num_nodes for g in batch_graph.to_data_list()]
 
@@ -202,6 +203,8 @@ class HamFinderGNN(HamiltonSolver, torch_lightning.LightningModule):
         return 1
 
     def solve_graphs(self, graphs):
+        for g in graphs:
+            g.to(self.device)
         graph_iterator = iter(graphs)
         batch_size = self.get_batch_size_for_multi_solving()
         batch_generator = ([first] + [d for d in itertools.islice(graph_iterator, batch_size - 1)]

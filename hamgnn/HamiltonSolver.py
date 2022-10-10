@@ -19,7 +19,6 @@ class HamiltonSolver(ABC):
         if is_show_progress:
             graphs = tqdm(list(graphs))
         for g in graphs:
-            g.to(self.device)
             start = time.thread_time_ns()
             solution = self.solve(g)
             end = time.thread_time_ns()
