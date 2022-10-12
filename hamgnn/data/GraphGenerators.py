@@ -1,4 +1,3 @@
-from cmath import e
 import numpy
 import torch_geometric as torch_g
 import torch
@@ -15,7 +14,7 @@ class GraphGenerator(ABC):
         pass
 
 
-def _generate_ERmk_model_edge_index_for_small_k(num_nodes, num_edges):
+def _generate_ERmk_for_small_k(num_nodes, num_edges):
     _edge_fraction = 2 * num_edges / (num_nodes * (num_nodes - 1))
     if _edge_fraction > 1/2:
         print(f"Using inefficient method (ment for sparse graph with edge fraction << 1) for Erdos-Renyi graph with edge fraction {_edge_fraction}")
@@ -37,31 +36,32 @@ def _generate_ERmk_model_edge_index_for_small_k(num_nodes, num_edges):
     return edge_index
 
 
-def generate_ERp_model_edge_index_for_small_k(num_nodes, prob):
+def generate_ERp_for_small_p(num_nodes, prob):
     num_edges = numpy.random.binomial(num_nodes * (num_nodes-1) // 2, prob)
-    return _generate_ERmk_model_edge_index_for_small_k(num_nodes, num_edges)
+    return _generate_ERmk_for_small_k(num_nodes, num_edges)
 
 
 class NoisyCycleGenerator(GraphGenerator):
-    def __init__(self, num_nodes, expected_noise_edge_for_node):
+    def __init__(self, num_nodes, expected_noise_edges_per_node):
         self.num_nodes = num_nodes
-        self.expected_noise_edge_for_node = expected_noise_edge_for_node
+        self.expected_noise_edges_per_node = expected_noise_edges_per_node
 
     def _generate_noisy_cycle(self):
         d = torch_g.data.Data()
-        ER_edge_index = generate_ERp_model_edge_index_for_small_k(self.num_nodes,
-                                                        self.expected_noise_edge_for_node / self.num_nodes)
+        ER_edge_index = generate_ERp_for_small_p(self.num_nodes,
+                                                        self.expected_noise_edges_per_node / (self.num_nodes-1))
         artificial_cycle = torch.randperm(self.num_nodes)
         artificial_edges = torch.stack([artificial_cycle, artificial_cycle.roll(-1, 0)], dim=0)
         artificial_edges = torch.cat([artificial_edges, artificial_edges.flip(dims=(-2,))], dim=-1)
         artificial_cycle = torch.cat([artificial_cycle, artificial_cycle[0].unsqueeze(0)], dim=0)
         d.num_nodes = self.num_nodes
         d.edge_index = torch.cat([ER_edge_index, artificial_edges], dim=-1)
+        d.edge_index = d.edge_index.unique(dim=-1)
         choice_distribution = None
         return GraphExample(d, artificial_cycle, choice_distribution)
 
     def output_details(self):
-        return f"A cycle of with expected {self.expected_noise_edge_for_node} noise edge per node"
+        return f"A cycle of with expected {self.expected_noise_edges_per_node} noise edge per node"
 
     def __iter__(self):
         return (self._generate_noisy_cycle() for _ in itertools.count())
@@ -81,7 +81,7 @@ class ErdosRenyiGenerator:
     def _erdos_renyi_generator(self):
         d = torch_g.data.Data()
         d.num_nodes = self.num_nodes
-        d.edge_index = generate_ERp_model_edge_index_for_small_k(d.num_nodes, self.p)
+        d.edge_index = generate_ERp_for_small_p(d.num_nodes, self.p)
         return d
 
     def output_details(self):
