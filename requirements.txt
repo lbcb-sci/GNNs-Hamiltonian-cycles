@@ -10,3 +10,4 @@ torchinfo
 wandb
 matplotlib
 seaborn
+networkit
