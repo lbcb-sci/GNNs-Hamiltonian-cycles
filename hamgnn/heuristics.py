@@ -6,6 +6,7 @@ from copy import deepcopy
 
 from hamgnn.HamiltonSolver import HamiltonSolver
 
+
 def _to_networkit(num_nodes, edge_index: torch.tensor):
     g = networkit.Graph(num_nodes)
     for edge in edge_index.t():
@@ -62,13 +63,14 @@ def _rotational_options(g, path):
 def _invert_path(path):
     return [path[i] for i in range(len(path) - 1, -1, -1)]
 
+
 class LeastDegreeFirstHeuristics(HamiltonSolver):
     def solve_graphs(self, graphs):
         return [least_degree_first_heuristics(graph.num_nodes, graph.edge_index, True) for graph in graphs]
 
 
 def _path_nr_extendable_nodes(graph, p):
-    return len([x for x in graph.iterNeighbors(p[-1]) if x not in p]) > 0
+    return len([x for x in graph.iterNeighbors(p[-1]) if x not in p])
 
 
 class HybridHam(HamiltonSolver):
@@ -97,7 +99,7 @@ class HybridHam(HamiltonSolver):
                     if edge[0] in path[:-1] or edge[1] in path[:-1]:
                         reduced_graph.removeEdge(*edge)
                 extension = _least_degree_first(reduced_graph, path[-1], map_node_to_degree, is_use_unreachable_vertex_heuristics=True)
-                path = path[:-1] + extension
+                path = path[:-1] + extension # extension will start with path[-1]
             else:
                 return path
 
