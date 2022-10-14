@@ -48,8 +48,8 @@ class EvaluationScores:
         return {"is_cycle": is_cycle, "is_valid": is_valid, "length": nr_unique_nodes, "size": sizes}
 
     @staticmethod
-    def solve_time_and_evaluate(timed_solve_graphs, graphs: List[torch_g.data.Data]):
-        solutions, times = timed_solve_graphs(g for g in graphs)
+    def solve_time_and_evaluate(timed_solve_graphs, graphs: List[torch_g.data.Data], is_show_progress=False):
+        solutions, times = timed_solve_graphs(list(g for g in graphs), is_show_progress)
         evals = EvaluationScores.evaluate(graphs, solutions)
         evals["time"] = times
         return evals
