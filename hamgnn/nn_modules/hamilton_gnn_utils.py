@@ -163,7 +163,8 @@ class HamFinderGNN(HamiltonSolver, torch_lightning.LightningModule):
                 _, next_step_choices = self.gnn_model._neighbor_prob_and_greedy_choice_for_batch(batch_graph)
                 return next_step_choices
 
-        walks = self._run_on_graph_batch(batch_graph, GreedyRunInstructions(self))
+        with torch.no_grad():
+            walks = self._run_on_graph_batch(batch_graph, GreedyRunInstructions(self))
         return walks
 
     @staticmethod

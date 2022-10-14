@@ -43,6 +43,7 @@ class DataUtils:
             return []
         neighbor_index = d.edge_index[1, torch.any(d.edge_index[None, 0, :] == current[:, None], dim=0)]
         return neighbor_index.unique()
+
     @staticmethod
     def _mask_neighbor_logits(logits, d: torch_g.data.Data):
         valid_next_step_indices = torch.cat([DataUtils._neighbor_indices(d), DataUtils._current_indices(d)])
