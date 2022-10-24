@@ -167,6 +167,7 @@ train_request_HamS_rare_really_small.arguments["datamodule_hyperparams"].update(
 
 # GPU training
 train_request_HamS_gpu = copy.deepcopy(train_request_HamS)
+
 train_request_HamS_gpu.arguments["datamodule_class"] = DataModules.ArtificialCycleDataModule
 del train_request_HamS_gpu.arguments["datamodule_hyperparams"]["val_hamiltonian_existence_probability"]
 train_request_HamS_gpu.arguments["model_hyperparams"]["val_dataloader_tags"] = ["artificial"]
@@ -174,6 +175,10 @@ train_request_HamS_gpu.arguments["trainer_hyperparams"].update({
     "gpus": [0]
 })
 train_request_HamS_gpu.arguments["datamodule_hyperparams"].update({"train_batch_size": 16, "val_batch_size": 8})
+train_request_HamS_gpu.arguments["trainer_hyperparams"].update({
+    "log_every_n_steps": 10,
+    "check_val_every_n_epoch": 10,
+})
 train_request_HamS_gpu.arguments["trainer_hyperparams"]["callbacks"] = train_request_HamS_gpu.arguments["trainer_hyperparams"]["callbacks"][:-1] \
     + [ModelCheckpoint(save_top_k=3, save_last=True, monitor="val/artificial/hamiltonian_cycle")]
 
@@ -195,6 +200,16 @@ train_request_HamS_gpu_large_size_50.arguments["datamodule_hyperparams"].update(
 # GNN operations include random features
 train_request_HamS_gpu_with_rand_node_encoding = copy.deepcopy(train_request_HamS_gpu)
 train_request_HamS_gpu_with_rand_node_encoding.arguments["model_class"] = EncodeProcessDecodeRandFeatures
+
+# Testing training on different graph sizes
+train_request_Hamrand_35 = copy.deepcopy(train_request_HamS_gpu_with_rand_node_encoding)
+train_request_Hamrand_35.arguments["datamodule_hyperparams"].update({"train_graph_size": 35, "val_graph_size": 35})
+
+train_request_Hamrand_20 = copy.deepcopy(train_request_Hamrand_35)
+train_request_Hamrand_20.arguments["datamodule_hyperparams"].update({"train_graph_size": 20, "val_graph_size": 20})
+
+train_request_Hamrand_30 = copy.deepcopy(train_request_HamS_gpu_with_rand_node_encoding)
+train_request_Hamrand_30.arguments["datamodule_hyperparams"].update({"train_graph_size": 30, "val_graph_size": 30})
 
 # Improved environment input embedding
 from hamgnn.nn_modules.EncodeProcessDecodeAdvancedPositionalEmbedding import EncodeProcessDecodeAdvancedPositionalEmbedding
