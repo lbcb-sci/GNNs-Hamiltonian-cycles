@@ -96,7 +96,7 @@ class EvaluationScores:
                 yield (graph, ham_cycle)
 
     @staticmethod
-    def evaluate_on_saved_data(compute_walks_from_graph_list_fn, nr_graphs_per_size=10, data_folders=None):
+    def evaluate_on_saved_data(compute_walks_from_graph_list_fn, nr_graphs_per_size=10, data_folders=None, is_show_progress=False):
         if data_folders is None:
             data_folders = EVALUATION_DATA_FOLDERS
 
@@ -107,16 +107,16 @@ class EvaluationScores:
         is_hamiltonian = numpy.array([x[1] is not None and len(x[1]) > 0 for x in _get_generator()])
 
         graph_list = [graph for graph, ham_cycle in _get_generator()]
-        evals = EvaluationScores.solve_time_and_evaluate(compute_walks_from_graph_list_fn, graph_list)
+        evals = EvaluationScores.solve_time_and_evaluate(compute_walks_from_graph_list_fn, graph_list, is_show_progress)
         evals["is_graph_hamiltonian"] = is_hamiltonian
         return evals
 
     @staticmethod
     def evaluate_model_on_saved_data(nn_hamilton: HamiltonSolver, nr_graphs_per_size=10, data_folders=None, is_show_progress=False):
-        def _compute_walks_from_graph_list_fn(graph_list):
-            return nn_hamilton.timed_solve_graphs(graph_list, is_show_progress)
+        def _compute_walks_from_graph_list_fn(graph_list, _is_show_progres):
+            return nn_hamilton.timed_solve_graphs(graph_list, _is_show_progres)
 
-        return EvaluationScores.evaluate_on_saved_data(_compute_walks_from_graph_list_fn, nr_graphs_per_size, data_folders)
+        return EvaluationScores.evaluate_on_saved_data(_compute_walks_from_graph_list_fn, nr_graphs_per_size, data_folders, is_show_progress)
 
     @staticmethod
     def accuracy_scores_on_saved_data(solvers: List[HamiltonSolver], solver_names: List[str], nr_graphs_per_size=10, data_folders=None, best_possible_score=None, is_show_progress=False):
