@@ -18,9 +18,14 @@ WEIGHTS_AND_BIASES_PROJECT = config["LOGGING"]["WEIGHTS_AND_BIASES_PROJECT"]
 HAMILTONIAN_PROBABILITY = 0.8
 MAX_NR_BATCHES_TO_USE_FOR_EVALUATION = 10
 EVALUATION_DATA_FOLDERS = ["DATA"]
+FHCP_BENCHMARK_DIR = config["DATABASE"]["FHCP_BENCHMARK_DIR"]
 EVALUATION_MINIMAL_TEST_DATA_FOLDERS = ["DATA/Erdos_Renyi(25,02453).pt"]
 
 MODEL_CHECKPOINT_SAVING_DIRECTORY = config["LOGGING"]["CHECKPOINT_STORAGE_DIRECTORY"]
 WANDB_DIRECTORY = config["LOGGING"]["WANDB_DIRECTORY"]
 
 DEFAULT_FINAL_TEST_TAG = "test/ER_80"
+
+FHCP_HOMEPAGE = "https://sites.flinders.edu.au/flinders-hamiltonian-cycle-project/fhcp-challenge-set/"
+FHCP_GRAPHS_URL = "http://sites.flinders.edu.au/flinders-hamiltonian-cycle-project/wp-content/uploads/sites/18/2020/01/FHCPCS.7z"
+FHCP_SOLUTIONS_URL = "http://sites.flinders.edu.au/flinders-hamiltonian-cycle-project/wp-content/uploads/sites/18/2020/01/FHCPCS_sols.7z"
