@@ -167,6 +167,50 @@ class HamFinderGNN(HamiltonSolver, torch_lightning.LightningModule):
             walks = self._run_on_graph_batch(batch_graph, GreedyRunInstructions(self))
         return walks
 
+
+    def run_beam_search(self, graph: torch_g.data.Data, beam_width=10, discard_eps=0.001):
+        class SearchData:
+            def __init__(self, graph, partial_walk, score) -> None:
+                self.graph = graph
+                self.partial_walk = partial_walk
+                self.score = score
+        graph = torch_g.data.Batch.from_data_list([graph])
+        self.init_graph(graph)
+        search_branches = [SearchData(graph.clone(), [], 0)]
+        solutions = []
+
+        for step_number in range(graph.num_nodes + 1):
+            new_branches = []
+            for branch in search_branches:
+                current = branch.partial_walk[-1] if len(branch.partial_walk) > 0 else None
+                if step_number in [0, 1]:
+                    self.prepare_for_first_step(branch.graph, current)
+                else:
+                    self.update_state(branch.graph, torch.tensor(current, device=branch.graph.edge_index.device))
+                neighbor_probs, _ = self._neighbor_prob_and_greedy_choice_for_batch(branch.graph)
+
+                # #TODO remove
+                # new_branches.append(SearchData(branch.graph, [x for x in branch.partial_walk] + [_.item()], branch.score))
+                for next_step in range(neighbor_probs.shape[-1]):
+                    prob = neighbor_probs[:, next_step]
+                    if prob < discard_eps:
+                        continue
+                    elif len(branch.partial_walk) > 0 and next_step == branch.partial_walk[0]:
+                        solutions.append(([x for x in branch.partial_walk] + [next_step], branch.score.item()))
+                    elif next_step in branch.partial_walk:
+                        solutions.append(([x for x in branch.partial_walk], branch.score.item()))
+                    else:
+                        new_branches.append(SearchData(branch.graph, [x for x in branch.partial_walk] + [next_step], branch.score + torch.log(prob)))
+            search_branches = sorted(new_branches, key=lambda b: b.score, reverse=True)[:beam_width]
+            for branch in search_branches:
+                branch.graph = branch.graph.clone()
+
+        # walk = search_branches[0].partial_walk #TODO remove
+        solutions.sort(key=lambda walk_score: (len(walk_score[0]), walk_score[1]), reverse=True)
+        walk = solutions[0][0]
+
+        return walk
+
     @staticmethod
     def _convert_batch_walk_tensor_into_solution_list(batch_walks_tensor, graphs_shift_inside_batch):
         batch_walks_tensor -= torch.from_numpy(graphs_shift_inside_batch[:, None]).to(batch_walks_tensor.device)
