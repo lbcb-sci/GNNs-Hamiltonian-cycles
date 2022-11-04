@@ -80,9 +80,10 @@ class ErdosRenyiGenerator:
 
     @staticmethod
     def create_from_edge_probability(num_nodes, edge_existence_probability):
-        ER_generator = ErdosRenyiExamplesGenerator(num_nodes, 1)
+        ER_generator = ErdosRenyiGenerator(num_nodes, 0.5)
         ER_generator.hamilton_existence_probability = None
         ER_generator.p = edge_existence_probability
+        return ER_generator
 
     def _erdos_renyi_generator(self):
         d = torch_g.data.Data()
