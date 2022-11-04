@@ -98,7 +98,7 @@ class EvaluationScores:
     @staticmethod
     def evaluate_on_saved_data(compute_walks_from_graph_list_fn, nr_graphs_per_size=10, data_folders=None, is_show_progress=False):
         if data_folders is None:
-            data_folders = GRAPH_DATA_DIRECTORY_SIZE_GENERALISATION
+            data_folders = [GRAPH_DATA_DIRECTORY_QUICK_EVALUATION]
 
         def _get_generator():
             graph_example_gen = InMemoryDataset.ErdosRenyiInMemoryDataset(data_folders)
