@@ -19,7 +19,8 @@ import hamgnn.nn_modules.hamilton_gnn_utils as gnn_utils
 
 def train_model(model_class, datamodule_class, model_checkpoint=None, model_hyperparams=None, datamodule_hyperparams=None,
                 trainer_hyperparams=None, train_parameters=None, model_checkpoint_hyperparams=None,
-                is_log_offline=False, wandb_project=constants.WEIGHTS_AND_BIASES_PROJECT, run_name=None, is_log_model=True):
+                is_log_offline=False, wandb_project=constants.WEIGHTS_AND_BIASES_PROJECT, run_name=None, is_log_model=True,
+                is_run_test_at_the_end=True):
     if model_hyperparams is None:
         model_hyperparams = {}
     if datamodule_hyperparams is None:
@@ -35,17 +36,10 @@ def train_model(model_class, datamodule_class, model_checkpoint=None, model_hype
         datetime_now = datetime.datetime.now()
         run_name = f"{model_class.__name__.split('.')[-1][:10]}_{datetime_now.strftime('%Y%m%d%H%M')[2:]}"
 
-
-    wandb_logger = lightning_loggers.WandbLogger(name=run_name, project=wandb_project, offline=is_log_offline, log_model=is_log_model)
-    wandb_logger.experiment.config["is_started_from_checkpoint"] = model_checkpoint is not None
-    for key, value in itertools.chain(datamodule_hyperparams.items(), trainer_hyperparams.items()):
-        wandb_logger.experiment.config[key] = value
-
     if model_checkpoint is None:
         model = model_class(**model_hyperparams)
     else:
         model = model_class.load_from_checkpoint(model_checkpoint)
-    wandb_logger.experiment.summary["description"] = model.description()
 
     datamodule_hyperparams.update({
         DataModules.LIGHTNING_MODULE_REFERENCE_KEYWORD: model,
@@ -53,17 +47,24 @@ def train_model(model_class, datamodule_class, model_checkpoint=None, model_hype
     datamodule = datamodule_class(**datamodule_hyperparams)
 
     trainer_hyperparams.update({
-        "logger": wandb_logger,
         "default_root_dir": Path(constants.MODEL_CHECKPOINT_SAVING_DIRECTORY).resolve()
     })
 
+    wandb_logger = lightning_loggers.WandbLogger(name=run_name, project=wandb_project, offline=is_log_offline, log_model=is_log_model)
+    wandb_logger.experiment.config["is_started_from_checkpoint"] = model_checkpoint is not None
+    for key, value in itertools.chain(datamodule_hyperparams.items(), trainer_hyperparams.items()):
+        wandb_logger.experiment.config[key] = value
+    wandb_logger.experiment.summary["description"] = model.description()
+    trainer_hyperparams["logger"]: wandb_logger
+
     model_checkpoint_hyperparams["save_last"] = True
-    checkpoint_callback = lightning_callbacks.ModelCheckpoint(**model_checkpoint_hyperparams)
-    callbacks = [checkpoint_callback]
+    failsafe_checkpoint_callback = lightning_callbacks.ModelCheckpoint(**model_checkpoint_hyperparams)
+    callbacks = [failsafe_checkpoint_callback]
     if "callbacks" in trainer_hyperparams:
-        trainer_hyperparams["callbacks"].extend(callbacks)
+            trainer_hyperparams["callbacks"].extend(callbacks)
     else:
         trainer_hyperparams["callbacks"] = callbacks
+    checkpoint_callback = [cb for cb in  trainer_hyperparams["callbacks"] if isinstance(cb, lightning_callbacks.ModelCheckpoint)][0]
 
     trainer = torch_lightning.Trainer(**trainer_hyperparams)
 
@@ -89,11 +90,12 @@ def train_model(model_class, datamodule_class, model_checkpoint=None, model_hype
         train_exception = ex
     finally:
         wandb_logger.experiment.config["checkpoint"] = str(checkpoint_callback.best_model_path)
-        test_on_saved_data(model, wandb_logger.experiment)
+        if is_run_test_at_the_end:
+            test_on_saved_data(model, wandb_logger.experiment)
         wandb_logger.finalize("Success")
         if train_exception is not None:
             raise train_exception
-
+    return model, checkpoint_callback.best_model_path
 
 def reconnect_to_wandb_run(wandb_run_id):
     return wandb.init(id=wandb_run_id, project=constants.WEIGHTS_AND_BIASES_PROJECT, resume=True)
@@ -136,12 +138,13 @@ def create_model_for_wandb_run(wandb_run, checkpoint_path=None):
 def load_existing_model(model_identifier, wandb_project=constants.WEIGHTS_AND_BIASES_PROJECT, wandb_run=None):
     checkpoint_path = Path(model_identifier)
     model = None
-
     if checkpoint_path.exists():
         try:
             model = create_model_from_checkpoint(checkpoint_path)
             if model is None:
                 return None, f"Failed to create model from {checkpoint_path}. Appropriate model classes seem to be missing."
+            else:
+                return model, f"OK"
         except Exception as ex:
             model = None
 
@@ -178,9 +181,11 @@ class ModelTrainRequest:
     def __init__(self, **kwargs):
         self.arguments = kwargs
 
-    def train(self, nr_cpu_threads=16, run_name=None):
+    def train(self, nr_cpu_threads=16, run_name=None, is_run_test_at_the_end=True):
         torch.set_num_threads(nr_cpu_threads)
         extended_arguments = self.arguments.copy()
         if "run_name" not in self.arguments or self.arguments["run_name"] is None:
-            extended_arguments.update({"run_name": run_name})
-        train_model(**extended_arguments)
+            extended_arguments.update({
+                "run_name": run_name,
+                "is_run_test_at_the_end": is_run_test_at_the_end})
+        return train_model(**extended_arguments)
