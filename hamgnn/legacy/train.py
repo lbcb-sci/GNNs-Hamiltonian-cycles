@@ -7,7 +7,7 @@ from hamgnn.Models import EncodeProcessDecodeAlgorithm, GatedGCNEmbedAndProcess,
 from hamgnn.Trainers import SupervisedTrainFollowingHamiltonCycle, REINFORCE_WithLearnableBaseline
 from hamgnn.data.GraphGenerators import ErdosRenyiGenerator, NoisyCycleBatchGenerator
 from hamgnn.Evaluation import EvaluationScores
-from hamgnn.constants import HAMILTONIAN_PROBABILITY, MAX_NR_BATCHES_TO_USE_FOR_EVALUATION, EVALUATION_DATA_FOLDERS
+from hamgnn.constants import DEFAULT_HAMILTONIAN_PROBABILITY, MAX_NR_BATCHES_TO_USE_FOR_EVALUATION, GRAPH_DATA_DIRECTORY_SIZE_GENERALISATION
 
 
 def train_HamS(is_load_weight=False, train_epochs=2000):
@@ -25,7 +25,7 @@ def train_HamR(is_load_weights=False, train_epochs=1000):
     HamR_model = GatedGCNEmbedAndProcess(is_load_weights, embedding_depth=8, processor_depth=5, hidden_dim=32)
     HamR_trainer = REINFORCE_WithLearnableBaseline(nr_epochs=train_epochs, iterations_in_epoch=100,
                                                    episodes_per_example=1, simulation_batch_size=1)
-    HamR_generator = ErdosRenyiGenerator(num_nodes=25, hamilton_existence_probability=HAMILTONIAN_PROBABILITY)
+    HamR_generator = ErdosRenyiGenerator(num_nodes=25, hamilton_existence_probability=DEFAULT_HAMILTONIAN_PROBABILITY)
     HamR_optimizer = torch.optim.Adam(HamR_model.parameters(), 1e-5)
     HamR_trainer.train(HamR_generator, HamR_model, HamR_optimizer)
     return HamR_model
@@ -33,7 +33,7 @@ def train_HamR(is_load_weights=False, train_epochs=1000):
 
 def evaluate_model(model, model_name):
     evaluations = EvaluationScores.evaluate_model_on_saved_data(model, MAX_NR_BATCHES_TO_USE_FOR_EVALUATION,
-                                                                 EVALUATION_DATA_FOLDERS)
+                                                                 GRAPH_DATA_DIRECTORY_SIZE_GENERALISATION)
     return EvaluationScores.compute_accuracy_scores(evaluations)
 
 

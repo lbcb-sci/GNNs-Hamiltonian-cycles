@@ -1,9 +1,12 @@
 import pickle
 import itertools
-from typing import List
+from typing import List, Callable
 from tqdm import tqdm
 from pathlib import Path
 from collections import defaultdict
+from collections.abc import Iterable
+import os
+import sys
 
 import torch.utils.data
 import torch_geometric
@@ -80,19 +83,41 @@ class ErdosRenyiInMemoryDataset(torch.utils.data.Dataset):
         return data_list
 
     @staticmethod
-    def create_dataset(out_folder, sizes, nr_examples_per_size=200, hamilton_existence_prob=0.8, solve_with_concorde=True):
+    def _create_dataset_from_generator(out_folder,
+                                           fn_get_generator:Callable[[int, float], GraphGenerators.ErdosRenyiGenerator],
+                                           generator_first_params, nr_examples, generator_second_params, solve_with_concorde, is_show_progress):
+        if not isinstance(nr_examples, Iterable):
+            nr_examples = [nr_examples for _ in generator_first_params]
+        if not isinstance(generator_second_params, Iterable):
+            generator_second_params = [generator_second_params for _ in generator_first_params]
+
         concorde = ExactSolvers.ConcordeHamiltonSolver()
-        progress_bar = tqdm(sizes, desc=f"Creating graph datasets")
-        for s in progress_bar:
-            progress_bar.set_description(f"Creating dataset of graph of size {s}")
-            data = []
-            generator = GraphGenerators.ErdosRenyiGenerator(num_nodes=s, hamilton_existence_probability=hamilton_existence_prob)
-            edge_inclusion_probability = generator.p
-            for g in tqdm(itertools.islice(generator, nr_examples_per_size), total=nr_examples_per_size, leave=False):
-                hamiltonian_cycle = concorde.solve(g) if solve_with_concorde else None
-                data.append(ErdosRenyiGraphExample(g, edge_inclusion_probability, hamiltonian_cycle, hamilton_existence_prob))
-            filepath = Path(out_folder) / "Erdos_Renyi({},{:05d}).pt".format(s, int(edge_inclusion_probability*10_000))
-            ErdosRenyiInMemoryDataset.save_to_file(filepath, data)
+        with open(os.devnull, "w") as devnull_file:
+            _progress_file = sys.stdout if is_show_progress else devnull_file
+            progress_bar = tqdm(list(zip(generator_first_params, nr_examples, generator_second_params)), desc=f"Creating graph datasets", file=_progress_file)
+            for s, nr_examples, ham_prob in progress_bar:
+                progress_bar.set_description(f"Creating dataset with size={s} and prob {ham_prob}")
+                data = []
+                generator = fn_get_generator(s, ham_prob)
+                edge_inclusion_probability = generator.p
+                for g in tqdm(itertools.islice(generator, nr_examples), total=nr_examples, leave=False, file=_progress_file):
+                    hamiltonian_cycle = concorde.solve(g) if solve_with_concorde else None
+                    data.append(ErdosRenyiGraphExample(g, edge_inclusion_probability, hamiltonian_cycle, generator_second_params))
+                filepath = Path(out_folder) / "Erdos_Renyi({},{:05d}).pt".format(s, int(edge_inclusion_probability*10_000))
+                ErdosRenyiInMemoryDataset.save_to_file(filepath, data)
+
+    @staticmethod
+    def create_dataset_in_critical_regime(out_folder, sizes, nr_examples=200, hamilton_existence_prob=0.8, solve_with_concorde=True, is_show_progress=True):
+        ErdosRenyiInMemoryDataset._create_dataset_from_generator(
+            out_folder, lambda s, p: GraphGenerators.ErdosRenyiGenerator(s, p), sizes, nr_examples, hamilton_existence_prob, solve_with_concorde, is_show_progress
+            )
+
+    @staticmethod
+    def create_dataset_from_edge_probabilities(out_folder, sizes, nr_examples, edge_existence_probability, solve_with_concorde=True, is_show_progress=True):
+        ErdosRenyiInMemoryDataset._create_dataset_from_generator(
+            out_folder, lambda s, p: GraphGenerators.ErdosRenyiGenerator.create_from_edge_probability(s, p), sizes, nr_examples,
+            edge_existence_probability, solve_with_concorde, is_show_progress
+            )
 
     def __init__(self, path_list, transform=None):
         assert path_list is not None
