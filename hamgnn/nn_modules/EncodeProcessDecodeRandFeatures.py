@@ -2,6 +2,7 @@ import torch
 from hamgnn.nn_modules.EncodeProcessDecodeNN import EncodeProcessDecodeAlgorithm
 from hamgnn.nn_modules.nn_modules import RandomFeaturesWrapper, ResidualMultilayerMPNN
 
+
 class EncodeProcessDecodeRandFeatures(EncodeProcessDecodeAlgorithm):
     def __init__(self, rand_features_dim=4, **kwargs):
         self.rand_features_dim = rand_features_dim

@@ -5,7 +5,6 @@ from matplotlib import pyplot as plt
 
 DEFAULT_FIG_SIZE = (7, 7)
 
-
 def display_result_on_known_hamilton_graphs(d: torch_g.data.Data, nn_path, hamilton_cycle, display_node_labels=True,
                                             neural_path_color="red", remaining_edges_style="solid"):
     assert len(nn_path) > 0
@@ -26,11 +25,10 @@ def display_result_on_known_hamilton_graphs(d: torch_g.data.Data, nn_path, hamil
     return fig
 
 
-def display_ER_graph(d: torch_g.data):
+def display_ER_graph_spring(d: torch_g.data):
     g = torch_g.utils.to_networkx(d)
     g = nx.to_undirected(g)
     fig = plt.figure(figsize=DEFAULT_FIG_SIZE)
     ax = fig.add_subplot(1, 1, 1)
     nx.draw(g, nx.spring_layout(g), ax=ax)
     return fig
-
