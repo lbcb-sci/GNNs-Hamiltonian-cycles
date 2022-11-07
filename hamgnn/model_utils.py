@@ -55,7 +55,7 @@ def train_model(model_class, datamodule_class, model_checkpoint=None, model_hype
     for key, value in itertools.chain(datamodule_hyperparams.items(), trainer_hyperparams.items()):
         wandb_logger.experiment.config[key] = value
     wandb_logger.experiment.summary["description"] = model.description()
-    trainer_hyperparams["logger"]: wandb_logger
+    trainer_hyperparams["logger"] = wandb_logger
 
     model_checkpoint_hyperparams["save_last"] = True
     failsafe_checkpoint_callback = lightning_callbacks.ModelCheckpoint(**model_checkpoint_hyperparams)
