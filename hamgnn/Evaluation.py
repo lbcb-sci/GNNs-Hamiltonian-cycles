@@ -2,6 +2,7 @@ import pandas
 import numpy
 from typing import List
 import seaborn
+from tqdm import tqdm
 
 import torch
 import torch.utils.data
@@ -94,6 +95,22 @@ class EvaluationScores:
                 continue
             else:
                 yield (graph, ham_cycle)
+
+    @staticmethod
+    def accuracy_scores_per_model(models: List[HamiltonSolver], names: List[str], graphs: List[torch_g.data.Data], is_show_progress=False):
+        all_dfs = []
+        progress_bar = list(zip(models, names))
+        if is_show_progress:
+            progress_bar = tqdm(progress_bar)
+        for model, name in progress_bar:
+            evals = EvaluationScores.solve_time_and_evaluate(lambda graphs, is_show_progress: model.timed_solve_graphs(graphs, is_show_progress),
+                                                             graphs, is_show_progress=is_show_progress)
+            _df = EvaluationScores.compute_accuracy_scores(evals)
+            _df["name"] = name
+            all_dfs.append(_df)
+        df_combined = pandas.concat(all_dfs, axis="index").reset_index(drop=True)
+        return df_combined
+
 
     @staticmethod
     def evaluate_on_saved_data(compute_walks_from_graph_list_fn, nr_graphs_per_size=10, data_folders=None, is_show_progress=False):
