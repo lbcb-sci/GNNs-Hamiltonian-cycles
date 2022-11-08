@@ -120,4 +120,5 @@ if __name__ == '__main__':
     main_model = load_main_model()
 
     # generate_graph_previews(main_model, dataset, output_directory=output_directory)
-    generate_comparison_plot(main_model, dataset,output_directory=output_directory)
+    with plt.style.context("seaborn-paper"):
+        generate_comparison_plot(main_model, dataset,output_directory=output_directory)

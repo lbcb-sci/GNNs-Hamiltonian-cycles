@@ -49,7 +49,6 @@ def display_accuracies(df: pandas, ax, colors=None, line_styles=None, fill_alpha
     _yticks = [0.1 * x for x in range(0, 11, 1)]
     ax.set_yticks(_yticks)
     ax.set_yticklabels([f"{x:.1f}" for x in _yticks])
-    ax.hlines(_yticks, _x_min, _x_max, color="black", linestyle="dotted", alpha=0.1)
 
     for idx, (group_name, group) in enumerate(df.groupby("name")):
         line_style = line_styles[idx]
