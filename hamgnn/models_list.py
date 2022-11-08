@@ -54,7 +54,7 @@ train_request_HamS = model_utils.ModelTrainRequest(
 lr_callbacks = [LearningRateMonitor(logging_interval="step")]
 norm_monitoring_callbacks = [my_callbacks.create_lp_callback(target_type, p_norm) for target_type
        in ["max_lp_logits", "max_lp_weights", "max_lp_gradients", "flat_lp_gradients"] for p_norm in [2, 5]]
-checkpoint_callbacks = [ModelCheckpoint(save_top_k=3, save_last=True, monitor="val/ER/hamiltonian_cycle")]
+checkpoint_callbacks = [ModelCheckpoint(save_top_k=3, save_last=True, monitor="val/ER/hamiltonian_cycle", mode="max")]
 train_request_HamS.arguments["trainer_hyperparams"]["callbacks"] = lr_callbacks + norm_monitoring_callbacks + checkpoint_callbacks
 
 
@@ -180,7 +180,7 @@ train_request_HamS_gpu.arguments["trainer_hyperparams"].update({
     "check_val_every_n_epoch": 10,
 })
 train_request_HamS_gpu.arguments["trainer_hyperparams"]["callbacks"] = train_request_HamS_gpu.arguments["trainer_hyperparams"]["callbacks"][:-1] \
-    + [ModelCheckpoint(save_top_k=3, save_last=True, monitor="val/artificial/hamiltonian_cycle")]
+    + [ModelCheckpoint(save_top_k=3, save_last=True, monitor="val/artificial/hamiltonian_cycle", mode="max")]
 
 train_request_HamS_gpu_layer_norm = copy.deepcopy(train_request_HamS_gpu)
 train_request_HamS_gpu_layer_norm.arguments["model_class"] = EncodeProcessDecodeWithLayerNorm.EncodeProcessDecodeWithLayerNorm
