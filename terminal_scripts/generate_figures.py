@@ -8,7 +8,7 @@ import torch_geometric as torch_g
 from matplotlib import pyplot as plt
 
 from hamgnn.data.InMemoryDataset import ErdosRenyiInMemoryDataset
-from hamgnn.visualisation_tools import display_ER_graph_spring, display_result_on_known_hamilton_graphs, display_accuracies
+from hamgnn.visualisation_tools import display_ER_graph_spring, display_result_on_known_hamilton_graphs, display_accuracies, display_runtimes
 from hamgnn.Evaluation import EvaluationScores
 from hamgnn.main_model import load_main_model
 import hamgnn.constants as constants
@@ -18,6 +18,9 @@ from hamgnn.ExactSolvers import ConcordeHamiltonSolver
 
 COMPARISON_WITH_HEURISTICS_CSV_FILENAME = "comparison_with_heuristics.csv"
 COMPARISON_WITH_HEURISTICS_FIGURE_STEM = "comparison_with_heuristics"
+NON_CRITICAL_CSV_FILENAME = "non_critical_regime.csv"
+SUPERCRITICAL_FIGURE_STEM = "non_critical_regime"
+RUNTIMES_FIGURE_STEM = "runtimes"
 
 
 def _group_graphs_by_size(dataset):
@@ -58,6 +61,9 @@ def generate_graph_previews(model, dataset, output_directory: Path):
                 graph_example.graph, nn_solution, teacher_HC, display_node_labels=False, neural_path_color="red", remaining_edges_style="dotted")
             fig_circular_with_ham.savefig(output_directory / f"ER_{graph_size}_circular_layout_with_HC.png")
             break
+
+def _load_or_generate_data_if_missing(name_to_solver_map, dataset, csv_path: Path):
+    pass
 
 
 def generate_comparison_plot(model, dataset, output_directory, name_to_solver_map=None, figure_extension="png"):
@@ -108,6 +114,41 @@ def generate_comparison_plot(model, dataset, output_directory, name_to_solver_ma
     fig.savefig(figure_path, format=figure_extension)
 
 
+def generate_supercritical_plot(model, model_name, dataset, output_directory, figure_extension="png"):
+    assert figure_extension in ["png", "pdf"], "Only .pdf and .pgn outputs supported"
+    output_directory = Path(output_directory)
+    csv_path = output_directory / NON_CRITICAL_CSV_FILENAME
+
+    size_to_graphs_list = _group_graphs_by_size(dataset)
+    graphs_list = [graph_example.graph for graph_example in dataset]
+    if not csv_path.exists():
+        print(f"No supercritical data found at {csv_path}. Running computations")
+        df_noncritical = EvaluationScores.accuracy_scores_per_model([model], [model_name], graphs_list, is_show_progress=True)
+        df_noncritical.to_csv(csv_path, index=False)
+        print(f"Succesfully computed")
+    else:
+        print(f"Loading supercritical data from {csv_path}")
+    df_noncritical = pandas.read_csv(csv_path)
+    for size in df_noncritical["size"].unique():
+        df_noncritical.loc[df_noncritical["size"] == size, "confidence_delta"] = _accuracy_confidence_interval(len(size_to_graphs_list[size]))
+
+    figure_path = output_directory / f"{SUPERCRITICAL_FIGURE_STEM}.{figure_extension}"
+    fig, ax = plt.subplots()
+    display_accuracies(df_noncritical, ax, colors="black", line_styles="o--")
+    fig.savefig(figure_path, format=figure_extension)
+
+
+def generate_plot_of_runtimes(model, output_directory, figure_extension="png"):
+    assert figure_extension in ["png", "pdf"], "Only .png and .pdf output formats currently supported."
+    csv_path = output_directory / COMPARISON_WITH_HEURISTICS_CSV_FILENAME
+    df_test_results = pandas.read_csv(csv_path)
+    fig_path = output_directory / f"{RUNTIMES_FIGURE_STEM}.{figure_extension}"
+    fig, ax = plt.subplots()
+    display_runtimes(df_test_results, ax)
+    fig.savefig(fig_path, formta=figure_extension)
+    return fig
+
+
 if __name__ == '__main__':
     parser = ArgumentParser("Generates figures presented in the papaer")
     parser.add_argument("output_dir", type=str, help="Directory where images are stored")
@@ -119,6 +160,9 @@ if __name__ == '__main__':
     dataset = ErdosRenyiInMemoryDataset([constants.GRAPH_DATA_DIRECTORY_SIZE_GENERALISATION])
     main_model = load_main_model()
 
-    # generate_graph_previews(main_model, dataset, output_directory=output_directory)
+    generate_graph_previews(main_model, dataset, output_directory=output_directory)
     with plt.style.context("seaborn-paper"):
         generate_comparison_plot(main_model, dataset,output_directory=output_directory)
+        generate_plot_of_runtimes(main_model, output_directory=output_directory)
+        supercritical_dataset = ErdosRenyiInMemoryDataset([constants.GRAPH_DATA_DIRECTORY_SUPERCRITICAL_CASE])
+        generate_supercritical_plot(HybridHam(), "Least degree first", supercritical_dataset, output_directory=output_directory)

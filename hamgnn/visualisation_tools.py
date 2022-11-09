@@ -36,7 +36,7 @@ def display_ER_graph_spring(d: torch_g.data):
     return fig
 
 
-def display_accuracies(df: pandas, ax, colors=None, line_styles=None, fill_alpha=0.2):
+def display_accuracies(df: pandas.DataFrame, ax, colors=None, line_styles=None, fill_alpha=0.2):
     _unique_sizes = sorted([s for s in df["size"].unique()])
     ax.set_xlabel("Graph size (number of nodes)")
     _x_min = 0
@@ -62,3 +62,7 @@ def display_accuracies(df: pandas, ax, colors=None, line_styles=None, fill_alpha
                 color=color,
                 alpha=fill_alpha)
     ax.legend()
+
+def display_runtimes(df: pandas.DataFrame, ax):
+    seaborn.set_palette(seaborn.color_palette())
+    seaborn.lineplot(data=df, x="size", y="avg_execution_time", hue="name", ax=ax)
