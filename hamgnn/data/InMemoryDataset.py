@@ -102,7 +102,7 @@ class ErdosRenyiInMemoryDataset(torch.utils.data.Dataset):
                 edge_inclusion_probability = generator.p
                 for g in tqdm(itertools.islice(generator, nr_examples), total=nr_examples, leave=False, file=_progress_file):
                     hamiltonian_cycle = concorde.solve(g) if solve_with_concorde else None
-                    data.append(ErdosRenyiGraphExample(g, edge_inclusion_probability, hamiltonian_cycle, generator_second_params))
+                    data.append(ErdosRenyiGraphExample(g, edge_inclusion_probability, hamiltonian_cycle, ham_prob))
                 filepath = Path(out_folder) / "Erdos_Renyi({},{:05d}).pt".format(s, int(edge_inclusion_probability*10_000))
                 ErdosRenyiInMemoryDataset.save_to_file(filepath, data)
 

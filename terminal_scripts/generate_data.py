@@ -18,7 +18,7 @@ def create_dataset_in_critical_regime(store_directory, sizes, nr_examples, hamil
     else:
         if len([x for x in store_directory.iterdir() if x.suffix == ".pt"]) > 0:
             print(f"Found existing files data in {store_directory}. Skipping this folder")
-        return
+            return
     print(f"Generating graphs for following (size, nr_examples, hamilton_existence_probabilty) parameters:\n"
           f"{list(zip(sizes, nr_examples, hamilton_existence_probabilities))}.\n"
           f"Data will be stored in {store_directory}. This might take a while...")
