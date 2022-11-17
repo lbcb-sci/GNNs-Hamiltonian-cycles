@@ -45,7 +45,7 @@ def display_accuracies(df: pandas.DataFrame, ax, colors=None, line_styles=None, 
     ax.set_xticks(_unique_sizes)
     ax.set_xticklabels(_unique_sizes)
     ax.set_ylabel("Fraction of graphs solved (HC found)")
-    ax.set_ylim(0, 1)
+    ax.set_ylim(0, 1.1)
     _yticks = [0.1 * x for x in range(0, 11, 1)]
     ax.set_yticks(_yticks)
     ax.set_yticklabels([f"{x:.1f}" for x in _yticks])
