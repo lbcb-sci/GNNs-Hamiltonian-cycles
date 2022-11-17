@@ -67,11 +67,10 @@ class EvaluationScores:
         return df
 
     @staticmethod
-    def compute_accuracy_scores(evals):
-        df = EvaluationScores.compute_scores(evals)
-
+    def _compute_accuracy_from_scores(df_scores):
         measurement_columns = ["is_ham_cycle", "is_ham_path", "is_approx_ham_cycle", "is_approx_ham_path", "time"]
-        scores = df[["size"] + measurement_columns].groupby("size").aggregate({name: "mean" for name in measurement_columns}).reset_index()
+        present_measurement_columns = [c for c in measurement_columns if c in df_scores]
+        df_scores = df_scores[["size"] + present_measurement_columns].groupby("size").aggregate({name: "mean" for name in present_measurement_columns}).reset_index()
         _columns_rename_dict = {
             "is_ham_cycle": EvaluationScores.ACCURACY_SCORE_TAGS.perc_hamilton_found,
             "is_ham_path": EvaluationScores.ACCURACY_SCORE_TAGS.perc_full_walks_found,
@@ -79,7 +78,12 @@ class EvaluationScores:
             "is_approx_ham_path": EvaluationScores.ACCURACY_SCORE_TAGS.perc_long_walks_found,
             "time": EvaluationScores.ACCURACY_SCORE_TAGS.avg_execution_time
         }
-        return scores.rename(columns=_columns_rename_dict)
+        return df_scores.rename(columns=_columns_rename_dict)
+
+    @staticmethod
+    def compute_accuracy_scores(evals):
+        df = EvaluationScores.compute_scores(evals)
+        return EvaluationScores._compute_accuracy_from_scores(df)
 
     @staticmethod
     def _filtered_generator(num_per_size, gen):
