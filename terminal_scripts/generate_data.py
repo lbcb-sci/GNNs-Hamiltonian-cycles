@@ -1,5 +1,4 @@
 import torch
-import shutil
 
 from hamgnn.data.InMemoryDataset import ErdosRenyiInMemoryDataset
 from hamgnn.constants import \
