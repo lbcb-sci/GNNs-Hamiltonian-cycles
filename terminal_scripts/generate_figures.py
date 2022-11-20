@@ -7,9 +7,12 @@ from collections import defaultdict
 import torch_geometric as torch_g
 from matplotlib import pyplot as plt
 import seaborn
+from typing import Callable, Any
 
 from hamgnn.data.InMemoryDataset import ErdosRenyiInMemoryDataset
-from hamgnn.visualisation_tools import display_ER_graph_spring, display_result_on_known_hamilton_graphs, display_accuracies, display_runtimes
+from hamgnn.data.GraphDataset import GraphExample
+from hamgnn.visualisation_tools import display_ER_graph_spring, display_result_on_known_hamilton_graphs, display_accuracies, \
+    display_runtimes, display_accuracies_with_respect_to_ham_existence_param
 from hamgnn.Evaluation import EvaluationScores
 from hamgnn.main_model import load_main_model
 import hamgnn.constants as constants
@@ -40,6 +43,13 @@ def _group_graphs_by_size(dataset):
     for graph_example in dataset:
         size_to_graphs_map[graph_example.graph.num_nodes].append(graph_example)
     return size_to_graphs_map
+
+def _group_graphs_by_parameter(dataset, fn_get_parameter_from_graph: Callable[[GraphExample], Any]):
+    param_to_graphs_map = defaultdict(list)
+    for graph_example in dataset:
+        param = fn_get_parameter_from_graph(graph_example)
+        param_to_graphs_map[param].append(graph_example)
+    return param_to_graphs_map
 
 
 def _accuracy_confidence_interval(nr_graphs, confidence_probability=0.95):
@@ -117,7 +127,7 @@ def _load_or_generate_accuracy_data_if_missing(name_to_solver_map, dataset, csv_
     df_combined = pandas.concat(_all_df, axis="index").reset_index(drop=True)
     df_combined.to_csv(csv_path, index=False)
     for size in df_combined["size"].unique():
-        df_combined.loc[df_combined["size"] == size, "confidence_delta"] = _accuracy_confidence_interval(len(size_to_graphs_map[size]))
+        df_combined.loc[df_combined["size"] == size, constants.PLOTS_CONFIDENCE_DELTA_TAG] = _accuracy_confidence_interval(len(size_to_graphs_map[size]))
     return df_combined
 
 
@@ -170,10 +180,12 @@ def generate_plot_of_runtimes(model, dataset, output_directory, figure_extension
 def generate_plot_of_ham_parametere_changes(model: HamiltonSolver, output_directory, figure_extension="png"):
     csv_path = output_directory / HAM_PARAMETER_CHANGE_CSV_FILENAME
 
+    dataset = ErdosRenyiInMemoryDataset([constants.GRAPH_DATA_DIRECTORY_HAM_PROB_GENERALISATION])
+    ham_ex_prob_to_graphs_map = _group_graphs_by_parameter(dataset, lambda graph_example: graph_example.hamilton_existence_probability)
+
     if csv_path.exists():
         df_results = pandas.read_csv(csv_path)
     else:
-        dataset = ErdosRenyiInMemoryDataset([constants.GRAPH_DATA_DIRECTORY_HAM_PROB_GENERALISATION])
         graphs, ham_existence_prob = zip(*[(graph_example.graph, graph_example.hamilton_existence_probability) for graph_example in  dataset])
         solutions = model.timed_solve_graphs(graphs, is_show_progress=True)[0]
         eval = EvaluationScores.evaluate(graphs=graphs, solutions=solutions)
@@ -182,14 +194,20 @@ def generate_plot_of_ham_parametere_changes(model: HamiltonSolver, output_direct
         _df_per_group = []
         for group_name, group in df_scores.groupby("ham_existence_prob"):
             _df_acc = EvaluationScores._compute_accuracy_from_scores(group)
+            _df_acc[constants.PLOTS_CONFIDENCE_DELTA_TAG] = len(group)
             _df_acc["name"] = group_name
-            # _df_acc["ham_existence_prob"] = group_name
+            _df_acc["hamilton_existence_probability"] = group_name
             _df_per_group.append(_df_acc)
         df_results = pandas.concat(_df_per_group).reset_index(drop=True)
+        df_results["name"] = OUR_MODEL_TAG
         df_results.to_csv(csv_path, index=False)
-    figure_path = f"{HAM_PARAMETER_CHANGE_FIGURE_STEM}.{figure_extension}"
+
+    for ham_ex_prob in df_results["hamilton_existence_probability"].unique():
+        df_results.loc[df_results["hamilton_existence_probability"] == ham_ex_prob, constants.PLOTS_CONFIDENCE_DELTA_TAG] = \
+            _accuracy_confidence_interval(len(ham_ex_prob_to_graphs_map[ham_ex_prob]))
+    figure_path = output_directory / f"{HAM_PARAMETER_CHANGE_FIGURE_STEM}.{figure_extension}"
     fig, ax = _get_default_figure_and_axis()
-    display_accuracies(df_results, ax, _get_default_colors(), ["o-" for _ in range(len(df_results["name"].unique()))])
+    display_accuracies_with_respect_to_ham_existence_param(df_results, ax, _get_default_colors(), ["o-" for _ in range(len(df_results["name"].unique()))])
     _save_figure(fig, figure_path=figure_path, format=figure_extension)
     return fig
 
@@ -201,6 +219,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     output_directory = Path(args.output_dir)
     figure_extension = args.ext
+
     if not output_directory.exists():
         output_directory.mkdir(parents=True)
 

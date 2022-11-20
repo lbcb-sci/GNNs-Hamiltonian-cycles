@@ -42,3 +42,5 @@ DEFAULT_FINAL_TEST_TAG = "test/ER_80"
 FHCP_HOMEPAGE = "https://sites.flinders.edu.au/flinders-hamiltonian-cycle-project/fhcp-challenge-set/"
 FHCP_GRAPHS_URL = "http://sites.flinders.edu.au/flinders-hamiltonian-cycle-project/wp-content/uploads/sites/18/2020/01/FHCPCS.7z"
 FHCP_SOLUTIONS_URL = "http://sites.flinders.edu.au/flinders-hamiltonian-cycle-project/wp-content/uploads/sites/18/2020/01/FHCPCS_sols.7z"
+
+PLOTS_CONFIDENCE_DELTA_TAG = "confidence_delta"
