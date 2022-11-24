@@ -44,6 +44,7 @@ def _group_graphs_by_size(dataset):
         size_to_graphs_map[graph_example.graph.num_nodes].append(graph_example)
     return size_to_graphs_map
 
+
 def _group_graphs_by_parameter(dataset, fn_get_parameter_from_graph: Callable[[GraphExample], Any]):
     param_to_graphs_map = defaultdict(list)
     for graph_example in dataset:
@@ -92,8 +93,13 @@ def _get_default_figure_and_axis():
 def _get_default_colors():
     return seaborn.color_palette()
 
+
+def _get_default_markers():
+    return ["o", ">", "^", "<", "v"]
+
+
 def _get_default_line_styles():
-    return ["o-", ">-", "^-", "<-", "v-"]
+    return [f"{marker}-" for marker in _get_default_markers()]
 
 
 def _save_figure(fig, figure_path, format="png"):
@@ -172,7 +178,7 @@ def generate_plot_of_runtimes(model, dataset, output_directory, figure_extension
 
     fig_path = output_directory / f"{RUNTIMES_FIGURE_STEM}.{figure_extension}"
     fig, ax = _get_default_figure_and_axis()
-    display_runtimes(df_test_results, ax)
+    display_runtimes(df_test_results, ax, colors=_get_default_colors(), markers=_get_default_markers())
     _save_figure(fig, fig_path, format=figure_extension)
     return fig
 

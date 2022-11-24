@@ -3,6 +3,7 @@ import seaborn
 import networkx as nx
 import torch_geometric as torch_g
 from matplotlib import pyplot as plt
+import math
 
 import hamgnn.constants as constants
 
@@ -47,7 +48,7 @@ def display_accuracies(df: pandas.DataFrame, ax, colors=None, line_styles=None, 
     ax.set_xticks(_unique_sizes)
     ax.set_xticklabels(_unique_sizes)
     ax.set_ylabel("Fraction of graphs solved (HC found)")
-    ax.set_ylim(0, 1.1)
+    ax.set_ylim(-0.05, 1.1)
     _yticks = [0.1 * x for x in range(0, 11, 1)]
     ax.set_yticks(_yticks)
     ax.set_yticklabels([f"{x:.1f}" for x in _yticks])
@@ -75,7 +76,7 @@ def display_accuracies_with_respect_to_ham_existence_param(df: pandas.DataFrame,
     ax.set_xticks(_unique_ham_probs)
     ax.set_xticklabels([f"{p:.2f}" for p in _unique_ham_probs])
     ax.set_ylabel("Fraction of solvable HCPs solved")
-    ax.set_ylim(0, 1.1)
+    ax.set_ylim(-0.05, 1.1)
     _yticks = [0.1 * x for x in range(0, 11, 1)]
     ax.set_yticks(_yticks)
     ax.set_yticklabels([f"{x:.1f}" for x in _yticks])
@@ -94,6 +95,18 @@ def display_accuracies_with_respect_to_ham_existence_param(df: pandas.DataFrame,
     ax.legend()
 
 
-def display_runtimes(df: pandas.DataFrame, ax):
-    seaborn.set_palette(seaborn.color_palette())
-    seaborn.lineplot(data=df, x="size", y="avg_execution_time", hue="name", ax=ax)
+def display_runtimes(df: pandas.DataFrame, ax, colors, markers):
+    ax.set_title("Runtimes")
+    seaborn.set_palette(colors)
+    seaborn.lineplot(data=df, x="size", y="avg_execution_time", hue="name", ax=ax, style="name", dashes=False, markers=markers)
+    ax.set_xlabel("Graph size")
+    ax.set_ylabel("Exeuction time (ms)")
+    time_min = df["avg_execution_time"].min()
+    time_max = df["avg_execution_time"].max()
+    yticks = [x / 10 for x in range(
+        max(math.floor(time_min * 10 - 1), 0),
+        math.ceil(time_max * 10 * 1.1))]
+    ylabels = [f"{int(x * 1000)}" for x in yticks]
+    ax.set_yticks(yticks)
+    ax.set_yticklabels(ylabels)
+    ax.legend()
