@@ -25,6 +25,7 @@ COMPARISON_WITH_HEURISTICS_CSV_FILENAME = "comparison_with_heuristics.csv"
 COMPARISON_WITH_HEURISTICS_FIGURE_STEM = "comparison_with_heuristics"
 SUPERCRITICAL_CSV_FILENAME = "non_critical_regime.csv"
 SUPERCRITICAL_FIGURE_STEM = "non_critical_regime"
+CRITICAL_REGIME_FIGURE_STEM = "critical_regime"
 RUNTIMES_FIGURE_STEM = "runtimes"
 HAM_PARAMETER_CHANGE_CSV_FILENAME = "ham_parameter_change.csv"
 HAM_PARAMETER_CHANGE_FIGURE_STEM = "ham_parameter_change"
@@ -165,8 +166,21 @@ def generate_supercritical_plot(dataset, output_directory, figure_extension="png
 
     figure_path = output_directory / f"{SUPERCRITICAL_FIGURE_STEM}.{figure_extension}"
     fig, ax = _get_default_figure_and_axis()
-    display_accuracies(df_noncritical[df_noncritical["name"].isin(name_to_solver_map)], ax, colors=["black", "black"], line_styles=_get_default_line_styles())
+    display_accuracies(df_noncritical[df_noncritical["name"].isin(name_to_solver_map)], ax, colors=_get_default_colors(), line_styles=_get_default_line_styles())
+    ax.set_title("Supercritical regime")
     _save_figure(fig, figure_path=figure_path, format=figure_extension)
+    return fig
+
+
+def generate_critical_regime_quality_plot(dataset, output_directory, figure_extension):
+    csv_path = csv_path=output_directory / COMPARISON_WITH_HEURISTICS_CSV_FILENAME
+    df = _load_or_generate_accuracy_data_if_missing({"Concorde": None}, dataset, csv_path=csv_path)
+    df = df[df["name"] == "Concorde"]
+    fig, ax = _get_default_figure_and_axis()
+    display_accuracies(df, ax, _get_default_colors(), _get_default_line_styles())
+    ax.set_title("Critical regime")
+    figure_path = output_directory / f"{CRITICAL_REGIME_FIGURE_STEM}.{figure_extension}"
+    _save_figure(fig, figure_path, figure_extension)
     return fig
 
 
@@ -238,4 +252,5 @@ if __name__ == '__main__':
         generate_plot_of_runtimes(main_model, dataset, output_directory=output_directory, figure_extension=figure_extension)
         supercritical_dataset = ErdosRenyiInMemoryDataset([constants.GRAPH_DATA_DIRECTORY_SUPERCRITICAL_CASE])
         generate_supercritical_plot(supercritical_dataset, output_directory=output_directory, figure_extension=figure_extension)
+        generate_critical_regime_quality_plot(dataset, output_directory=output_directory, figure_extension=figure_extension)
         generate_plot_of_ham_parametere_changes(main_model, output_directory=output_directory, figure_extension=figure_extension)
