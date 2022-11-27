@@ -4,6 +4,7 @@ import networkit
 import networkx as nx
 import torch
 from copy import deepcopy
+import numpy
 
 from hamgnn.HamiltonSolver import HamiltonSolver
 
@@ -125,7 +126,7 @@ class AntInspiredHeuristics(HamiltonSolver):
 
     def _solve(self, num_nodes, edge_index):
         g = _to_networkit(num_nodes, edge_index)
-        max_steps = 10 * num_nodes**2
+        max_steps = int(5 * numpy.log(num_nodes) * num_nodes**2)
         mu = [0 for _ in range(g.numberOfNodes())]
         tau = [0 for _ in range(g.numberOfNodes())]
         solution = deque()
