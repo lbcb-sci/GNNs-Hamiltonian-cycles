@@ -193,6 +193,7 @@ def generate_plot_of_runtimes(model, dataset, output_directory, figure_extension
     fig_path = output_directory / f"{RUNTIMES_FIGURE_STEM}.{figure_extension}"
     fig, ax = _get_default_figure_and_axis()
     display_runtimes(df_test_results, ax, colors=_get_default_colors(), markers=_get_default_markers())
+    ax.set_title("Runtime (ms)")
     _save_figure(fig, fig_path, format=figure_extension)
     return fig
 

@@ -96,13 +96,13 @@ def display_accuracies_with_respect_to_ham_existence_param(df: pandas.DataFrame,
 
 
 def display_runtimes(df: pandas.DataFrame, ax, colors, markers):
-    ax.set_title("Runtimes")
     seaborn.set_palette(colors)
     seaborn.lineplot(data=df, x="size", y="avg_execution_time", hue="name", ax=ax, style="name", dashes=False, markers=markers)
     ax.set_xlabel("Graph size")
     ax.set_ylabel("Exeuction time (ms)")
     time_min = df["avg_execution_time"].min()
-    time_max = df["avg_execution_time"].max()
+    time_max = min(df["avg_execution_time"].max(), 0.4)
+    ax.set_ylim((time_min - 0.05, time_max))
     yticks = [x / 10 for x in range(
         max(math.floor(time_min * 10 - 1), 0),
         math.ceil(time_max * 10 * 1.1))]
