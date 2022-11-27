@@ -59,7 +59,8 @@ def _accuracy_confidence_interval(nr_graphs, confidence_probability=0.95):
     return numpy.sqrt(-numpy.log((1 - confidence_probability) / 2) / (2 * nr_graphs))
 
 
-def generate_graph_previews(model, dataset, output_directory: Path):
+def generate_graph_previews(model, dataset, output_directory: Path, figure_extension="png"):
+    assert figure_extension in ["png", "pdf"], 'Only "png" or "pdf" allowed as extensions'
     size_to_graphs_map = _group_graphs_by_size(dataset)
     sizes = sorted(list(size_to_graphs_map.keys()))
 
@@ -75,15 +76,15 @@ def generate_graph_previews(model, dataset, output_directory: Path):
             if not valid_path:
                 raise Exception("Something is wrong with solution algorithm, it produces invalid path")
             fig_spring_layout = display_ER_graph_spring(graph_example.graph)
-            fig_spring_layout.savefig(output_directory / f"ER_{graph_size}_spring_layout.png")
+            fig_spring_layout.savefig(output_directory / f"ER_{graph_size}_spring_layout.{figure_extension}")
 
             fig_circular_layout = display_result_on_known_hamilton_graphs(
                 graph_example.graph, teacher_HC, teacher_HC, display_node_labels=False, neural_path_color="black")
-            fig_circular_layout.savefig(output_directory / f"ER_{graph_size}_circular_layout.png")
+            fig_circular_layout.savefig(output_directory / f"ER_{graph_size}_circular_layout.{figure_extension}")
 
             fig_circular_with_ham = display_result_on_known_hamilton_graphs(
                 graph_example.graph, nn_solution, teacher_HC, display_node_labels=False, neural_path_color="red", remaining_edges_style="dotted")
-            fig_circular_with_ham.savefig(output_directory / f"ER_{graph_size}_circular_layout_with_HC.png")
+            fig_circular_with_ham.savefig(output_directory / f"ER_{graph_size}_circular_layout_with_HC.{figure_extension}")
             break
 
 
@@ -247,7 +248,7 @@ if __name__ == '__main__':
     dataset = ErdosRenyiInMemoryDataset([constants.GRAPH_DATA_DIRECTORY_SIZE_GENERALISATION])
     main_model = load_main_model()
 
-    generate_graph_previews(main_model, dataset, output_directory=output_directory)
+    generate_graph_previews(main_model, dataset, output_directory=output_directory, figure_extension=figure_extension)
     with plt.style.context("seaborn-paper"):
         generate_comparison_plot(main_model, dataset,output_directory=output_directory, figure_extension=figure_extension)
         generate_plot_of_runtimes(main_model, dataset, output_directory=output_directory, figure_extension=figure_extension)
