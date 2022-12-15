@@ -19,6 +19,7 @@ import hamgnn.constants as constants
 from hamgnn.heuristics import HybridHam, LeastDegreeFirstHeuristics, AntInspiredHeuristics
 from hamgnn.ExactSolvers import ConcordeHamiltonSolver
 from hamgnn.HamiltonSolver import HamiltonSolver
+from hamgnn.nn_modules.hamilton_gnn_utils import HamFinderGNN
 
 
 COMPARISON_WITH_HEURISTICS_CSV_FILENAME = "comparison_with_heuristics.csv"
@@ -29,6 +30,7 @@ CRITICAL_REGIME_FIGURE_STEM = "critical_regime"
 RUNTIMES_FIGURE_STEM = "runtimes"
 HAM_PARAMETER_CHANGE_CSV_FILENAME = "ham_parameter_change.csv"
 HAM_PARAMETER_CHANGE_FIGURE_STEM = "ham_parameter_change"
+BEAM_SEARCH_FIGURE_STEM = "beam_search"
 
 HEURISTIC_SOLVERS_MAP = {
     "Concorde": ConcordeHamiltonSolver(),
@@ -37,6 +39,11 @@ HEURISTIC_SOLVERS_MAP = {
     "Ant-inspired": AntInspiredHeuristics(),
 }
 OUR_MODEL_TAG = "Our model"
+BEAM_SEARCH_STEM = "beam search"
+
+
+def get_beam_search_tag(beam_width):
+    return f"{BEAM_SEARCH_STEM} {beam_width}"
 
 
 def _group_graphs_by_size(dataset):
@@ -234,6 +241,40 @@ def generate_plot_of_ham_parametere_changes(model: HamiltonSolver, output_direct
     return fig
 
 
+class BeamSearchWrapper(HamiltonSolver):
+    def __init__(self, ham_gnn_model: HamFinderGNN, beam_width) -> None:
+        super().__init__()
+        self.ham_gnn_model = ham_gnn_model
+        self.beam_width = beam_width
+
+    def solve_graphs(self, graphs: list[torch_g.data.Data]) -> list[list[int]]:
+        results = []
+        for g in graphs:
+            results.append(self.ham_gnn_model.run_beam_search(g, beam_width=self.beam_width))
+        return results
+
+
+def generate_beam_search_plot(main_model, dataset, output_directory, figure_extension, beam_widths=None):
+    if beam_widths is None:
+        beam_widths = [2, 3, 5]
+    name_to_solver_map = {OUR_MODEL_TAG: main_model}
+    for width in beam_widths:
+        beam_model = BeamSearchWrapper(main_model, width)
+        name_to_solver_map[get_beam_search_tag(width)] = beam_model
+
+    output_directory = Path(output_directory)
+    csv_path = output_directory / COMPARISON_WITH_HEURISTICS_CSV_FILENAME
+
+    df_results = _load_or_generate_accuracy_data_if_missing(name_to_solver_map, dataset, csv_path)
+
+    figure_path = output_directory / f"{BEAM_SEARCH_FIGURE_STEM}.{figure_extension}"
+    fig, ax = _get_default_figure_and_axis()
+    display_accuracies(df_results, ax, _get_default_colors(), _get_default_line_styles())
+    ax.set_title("Beam search")
+    _save_figure(fig, figure_path=figure_path, format=figure_extension)
+    return fig
+
+
 if __name__ == '__main__':
     parser = ArgumentParser("Generates figures presented in the papaer")
     parser.add_argument("output_dir", type=str, help="Directory where images are stored")
@@ -256,3 +297,4 @@ if __name__ == '__main__':
         generate_supercritical_plot(supercritical_dataset, output_directory=output_directory, figure_extension=figure_extension)
         generate_critical_regime_quality_plot(dataset, output_directory=output_directory, figure_extension=figure_extension)
         generate_plot_of_ham_parametere_changes(main_model, output_directory=output_directory, figure_extension=figure_extension)
+        generate_beam_search_plot(main_model, dataset, output_directory, figure_extension=figure_extension)
