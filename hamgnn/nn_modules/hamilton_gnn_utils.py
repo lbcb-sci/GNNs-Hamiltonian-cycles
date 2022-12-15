@@ -189,8 +189,6 @@ class HamFinderGNN(HamiltonSolver, torch_lightning.LightningModule):
                     self.update_state(branch.graph, torch.tensor(current, device=branch.graph.edge_index.device))
                 neighbor_probs, _ = self._neighbor_prob_and_greedy_choice_for_batch(branch.graph)
 
-                # #TODO remove
-                # new_branches.append(SearchData(branch.graph, [x for x in branch.partial_walk] + [_.item()], branch.score))
                 for next_step in range(neighbor_probs.shape[-1]):
                     prob = neighbor_probs[:, next_step]
                     if prob < discard_eps:
@@ -205,7 +203,6 @@ class HamFinderGNN(HamiltonSolver, torch_lightning.LightningModule):
             for branch in search_branches:
                 branch.graph = branch.graph.clone()
 
-        # walk = search_branches[0].partial_walk #TODO remove
         solutions.sort(key=lambda walk_score: (len(walk_score[0]), walk_score[1]), reverse=True)
         walk = solutions[0][0]
 
