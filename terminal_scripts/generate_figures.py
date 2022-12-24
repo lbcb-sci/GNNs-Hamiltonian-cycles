@@ -39,7 +39,8 @@ HEURISTIC_SOLVERS_MAP = {
     "Ant-inspired": AntInspiredHeuristics(),
 }
 OUR_MODEL_TAG = "Our model"
-BEAM_SEARCH_STEM = "beam search"
+BEAM_SEARCH_STEM = "Beam width"
+BEAM_SEARCH_DEFAULT_WIDTHS = [2, 3, 5]
 
 
 def get_beam_search_tag(beam_width):
@@ -257,7 +258,7 @@ class BeamSearchWrapper(HamiltonSolver):
 
 def generate_beam_search_plot(main_model, dataset, output_directory, figure_extension, beam_widths=None):
     if beam_widths is None:
-        beam_widths = [2, 3, 5]
+        beam_widths = BEAM_SEARCH_DEFAULT_WIDTHS
     name_to_solver_map = {OUR_MODEL_TAG: main_model}
     for width in beam_widths:
         beam_model = BeamSearchWrapper(main_model, width)
