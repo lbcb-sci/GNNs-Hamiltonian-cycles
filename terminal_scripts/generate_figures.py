@@ -129,13 +129,13 @@ def _load_or_generate_accuracy_data_if_missing(name_to_solver_map, dataset, csv_
         print(f"Found some measurements in {csv_path}. Will only evaluate missing models")
         df_existing = pandas.read_csv(csv_path)
         _all_df.append(df_existing)
-        name_to_solver_map = {name: solver for name, solver in name_to_solver_map.items() if name not in df_existing["name"].unique()}
-    if len(name_to_solver_map) > 0:
+        missing_name_to_solver_map = {name: solver for name, solver in name_to_solver_map.items() if name not in df_existing["name"].unique()}
+    if len(missing_name_to_solver_map) > 0:
         eval_graphs_list = []
         for _, graphs in size_to_graphs_map.items():
             eval_graphs_list.extend([graph_example.graph for graph_example in graphs])
-        names, solvers = zip(*(name_to_solver_map.items()))
-        print(f"Evaluating {len(name_to_solver_map)} solvers: {names}")
+        names, solvers = zip(*(missing_name_to_solver_map.items()))
+        print(f"Evaluating {len(missing_name_to_solver_map)} solvers: {names}")
         df_new_data = EvaluationScores.accuracy_scores_per_model(solvers, names, eval_graphs_list, is_show_progress=True)
         _all_df.append(df_new_data)
         print("Evaluation complete!")
@@ -143,6 +143,7 @@ def _load_or_generate_accuracy_data_if_missing(name_to_solver_map, dataset, csv_
     df_combined.to_csv(csv_path, index=False)
     for size in df_combined["size"].unique():
         df_combined.loc[df_combined["size"] == size, constants.PLOTS_CONFIDENCE_DELTA_TAG] = _accuracy_confidence_interval(len(size_to_graphs_map[size]))
+    df_combined = df_combined[df_combined["name"].isin(name_to_solver_map.keys())]
     return df_combined
 
 
