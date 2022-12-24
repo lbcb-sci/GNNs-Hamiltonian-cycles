@@ -31,6 +31,7 @@ RUNTIMES_FIGURE_STEM = "runtimes"
 HAM_PARAMETER_CHANGE_CSV_FILENAME = "ham_parameter_change.csv"
 HAM_PARAMETER_CHANGE_FIGURE_STEM = "ham_parameter_change"
 BEAM_SEARCH_FIGURE_STEM = "beam_search"
+BEAM_SEARCH_RUNTIMES_FIGURE_STEM = "beam_search_runtimes"
 
 HEURISTIC_SOLVERS_MAP = {
     "Concorde": ConcordeHamiltonSolver(),
@@ -272,7 +273,28 @@ def generate_beam_search_plot(main_model, dataset, output_directory, figure_exte
     figure_path = output_directory / f"{BEAM_SEARCH_FIGURE_STEM}.{figure_extension}"
     fig, ax = _get_default_figure_and_axis()
     display_accuracies(df_results, ax, _get_default_colors(), _get_default_line_styles())
-    ax.set_title("Beam search")
+    ax.set_title("Performance of different beam widths")
+    _save_figure(fig, figure_path=figure_path, format=figure_extension)
+    return fig
+
+
+def generate_plot_of_beam_search_runtimes(main_model, dataset, output_directory, figure_extension="png", beam_widths=None):
+    if beam_widths is None:
+        beam_widths = BEAM_SEARCH_DEFAULT_WIDTHS
+    name_to_solver_map = {OUR_MODEL_TAG: main_model}
+    for width in beam_widths:
+        beam_model = BeamSearchWrapper(main_model, width)
+        name_to_solver_map[get_beam_search_tag(width)] = beam_model
+
+    output_directory = Path(output_directory)
+    csv_path = output_directory / COMPARISON_WITH_HEURISTICS_CSV_FILENAME
+
+    df_results = _load_or_generate_accuracy_data_if_missing(name_to_solver_map, dataset, csv_path)
+
+    figure_path = output_directory / f"{BEAM_SEARCH_RUNTIMES_FIGURE_STEM}.{figure_extension}"
+    fig, ax = _get_default_figure_and_axis()
+    display_runtimes(df_results, ax, _get_default_colors(), _get_default_markers(), ceil_on_time_axis=None)
+    ax.set_title("Runtime of different beam widths")
     _save_figure(fig, figure_path=figure_path, format=figure_extension)
     return fig
 
@@ -300,3 +322,4 @@ if __name__ == '__main__':
         generate_critical_regime_quality_plot(dataset, output_directory=output_directory, figure_extension=figure_extension)
         generate_plot_of_ham_parametere_changes(main_model, output_directory=output_directory, figure_extension=figure_extension)
         generate_beam_search_plot(main_model, dataset, output_directory, figure_extension=figure_extension)
+        generate_plot_of_beam_search_runtimes(main_model, dataset, output_directory, figure_extension)
