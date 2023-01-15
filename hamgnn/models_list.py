@@ -9,6 +9,7 @@ from hamgnn.nn_modules.EncodeProcessDecodeNoHiddenNN import _EncodeProcessDecode
 from hamgnn.nn_modules.EmbeddingAndMaxMPNN import EmbeddingAndMaxMPNN
 import hamgnn.nn_modules.EncodeProcessDecodeWithLayerNorm as EncodeProcessDecodeWithLayerNorm
 from hamgnn.nn_modules.EncodeProcessDecodeRandFeatures import EncodeProcessDecodeRandFeatures
+from hamgnn.nn_modules.EncodeProcessDecodeNoHiddenWithRandomFeatures import EncodeProcessDecodeNoHiddenRandomFeatures
 import hamgnn.data.DataModules as DataModules
 import hamgnn.model_utils as model_utils
 import hamgnn.callbacks as my_callbacks
@@ -200,6 +201,11 @@ train_request_HamS_gpu_large_size_50.arguments["datamodule_hyperparams"].update(
 # GNN operations include random features
 train_request_HamS_gpu_with_rand_node_encoding = copy.deepcopy(train_request_HamS_gpu)
 train_request_HamS_gpu_with_rand_node_encoding.arguments["model_class"] = EncodeProcessDecodeRandFeatures
+
+# Ablation, persistent features removed
+train_request_HamS_gpu_no_hidden_with_random_node_encoding = copy.deepcopy(train_request_HamS_no_hidden)
+train_request_HamS_gpu_no_hidden_with_random_node_encoding.arguments["model_class"] = EncodeProcessDecodeNoHiddenRandomFeatures
+train_request_HamS_gpu_no_hidden_with_random_node_encoding.arguments["trainer_hyperparams"]["gpus"] = [1]
 
 # Testing training on different graph sizes
 train_request_Hamrand_35 = copy.deepcopy(train_request_HamS_gpu_with_rand_node_encoding)
