@@ -132,6 +132,8 @@ def _load_or_generate_accuracy_data_if_missing(name_to_solver_map, dataset, csv_
         df_existing = pandas.read_csv(csv_path)
         _all_df.append(df_existing)
         missing_name_to_solver_map = {name: solver for name, solver in name_to_solver_map.items() if name not in df_existing["name"].unique()}
+    else:
+        missing_name_to_solver_map = name_to_solver_map.copy()
     if len(missing_name_to_solver_map) > 0:
         eval_graphs_list = []
         for _, graphs in size_to_graphs_map.items():
