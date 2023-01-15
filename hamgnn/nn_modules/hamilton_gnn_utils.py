@@ -204,7 +204,7 @@ class HamFinderGNN(HamiltonSolver, torch_lightning.LightningModule):
                 branch.graph = branch.graph.clone()
 
         solutions.sort(key=lambda walk_score: (len(walk_score[0]), walk_score[1]), reverse=True)
-        walk = solutions[0][0]
+        walk = solutions[0][0] if len(solutions) > 0 else []
 
         return walk
 
