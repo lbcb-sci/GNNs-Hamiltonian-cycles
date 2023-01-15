@@ -34,14 +34,18 @@ def _yes_no_input(message):
             print("Failed to understand the input. Please respond with 'yes'/'y' or 'no'/'n'.")
 
 
-def load_main_model():
-    if MAIN_MODEL_CHECKPOINT_PATH.exists():
-        model, load_message = model_utils.load_existing_model(MAIN_MODEL_CHECKPOINT_PATH)
+def _load_model(checkpoint_path, train_model_fn, name="model"):
+    if checkpoint_path.exists():
+        model, load_message = model_utils.load_existing_model(checkpoint_path)
     else:
-        is_train = _yes_no_input("The main model does not exist yet. Do you wish to train it?")
+        is_train = _yes_no_input(f"The {name} does not exist yet. Do you wish to train it?")
         if is_train:
-            model, checkpoint_path = train_main_model()
-            shutil.copyfile(checkpoint_path, MAIN_MODEL_CHECKPOINT_PATH)
+            model, tmp_checkpoint_path = train_model_fn()
+            shutil.copyfile(tmp_checkpoint_path, checkpoint_path)
     if torch.cuda.is_available():
         model = model.cuda()
     return model
+
+
+def load_main_model():
+    return _load_model(MAIN_MODEL_CHECKPOINT_PATH, train_main_model, "main model")
