@@ -12,9 +12,9 @@ from typing import Callable, Any
 from hamgnn.data.InMemoryDataset import ErdosRenyiInMemoryDataset
 from hamgnn.data.GraphDataset import GraphExample
 from hamgnn.visualisation_tools import display_ER_graph_spring, display_result_on_known_hamilton_graphs, display_accuracies, \
-    display_runtimes, display_accuracies_with_respect_to_ham_existence_param
+    display_runtimes, display_accuracies_with_respect_to_ham_existence_param, display_ablations
 from hamgnn.Evaluation import EvaluationScores
-from hamgnn.main_model import load_main_model
+from hamgnn.main_model import load_main_model, load_ablation_main_model, load_ablation_no_hidden_features, load_ablation_no_random_features
 import hamgnn.constants as constants
 from hamgnn.heuristics import HybridHam, LeastDegreeFirstHeuristics, AntInspiredHeuristics
 from hamgnn.ExactSolvers import ConcordeHamiltonSolver
@@ -32,6 +32,8 @@ HAM_PARAMETER_CHANGE_CSV_FILENAME = "ham_parameter_change.csv"
 HAM_PARAMETER_CHANGE_FIGURE_STEM = "ham_parameter_change"
 BEAM_SEARCH_FIGURE_STEM = "beam_search"
 BEAM_SEARCH_RUNTIMES_FIGURE_STEM = "beam_search_runtimes"
+ABLATIONS_CSV_FILENAME = "ablations.csv"
+ABLATIONS_FIGURE_STEM = "ablations_performance"
 
 HEURISTIC_SOLVERS_MAP = {
     "Concorde": ConcordeHamiltonSolver(),
@@ -301,6 +303,29 @@ def generate_plot_of_beam_search_runtimes(main_model, dataset, output_directory,
     return fig
 
 
+def generate_ablation_plot(dataset, output_directory, figure_extension, nr_retrains=5):
+    main_models = {f"Main model_{i}": load_ablation_main_model(i) for i in range(nr_retrains)}
+    no_hidden = {f"No persistent features_{i}": load_ablation_no_hidden_features(i) for i in range(nr_retrains)}
+    no_random = {f"No random features_{i}": load_ablation_no_random_features(i) for i in range(nr_retrains)}
+    name_to_solver_map = {}
+    name_to_solver_map.update(main_models)
+    name_to_solver_map.update(no_hidden)
+    name_to_solver_map.update(no_random)
+
+    output_directory = Path(output_directory)
+    csv_path = output_directory / ABLATIONS_CSV_FILENAME
+
+    df_results = _load_or_generate_accuracy_data_if_missing(name_to_solver_map, dataset, csv_path)
+
+    figure_path = output_directory / f"{ABLATIONS_FIGURE_STEM}.{figure_extension}"
+    fig, ax = _get_default_figure_and_axis()
+
+    df_results["class"] = df_results["name"].apply(lambda name: "_".join(name.split("_")[:-1]))
+    display_ablations(df_results, ax, _get_default_colors(), _get_default_line_styles())
+    _save_figure(fig, figure_path=figure_path, format=figure_extension)
+    return fig
+
+
 if __name__ == '__main__':
     parser = ArgumentParser("Generates figures presented in the papaer")
     parser.add_argument("output_dir", type=str, help="Directory where images are stored")
@@ -325,3 +350,4 @@ if __name__ == '__main__':
         generate_plot_of_ham_parametere_changes(main_model, output_directory=output_directory, figure_extension=figure_extension)
         generate_beam_search_plot(main_model, dataset, output_directory, figure_extension=figure_extension)
         generate_plot_of_beam_search_runtimes(main_model, dataset, output_directory, figure_extension)
+        generate_ablation_plot(dataset, output_directory, figure_extension)

@@ -114,3 +114,24 @@ def display_runtimes(df: pandas.DataFrame, ax, colors, markers, ceil_on_time_axi
     ax.set_yticks(yticks)
     ax.set_yticklabels(ylabels)
     ax.legend()
+
+
+def display_ablations(df: pandas.DataFrame, ax, colors=None, line_styles=None, fill_alpha=0.2):
+    _unique_sizes = sorted([s for s in df["size"].unique()])
+    ax.set_title("Ablation study")
+    ax.set_xlabel("Graph size (number of nodes)")
+    _x_min = 0
+    _x_max = max(_unique_sizes) * 1.1
+    ax.set_xlim(_x_min, _x_max)
+    ax.set_xticks(_unique_sizes)
+    ax.set_xticklabels(_unique_sizes)
+    ax.set_ylabel("Fraction of graphs solved (HC found)")
+    ax.set_ylim(-0.05, 1.1)
+    _yticks = [0.1 * x for x in range(0, 11, 1)]
+    ax.set_yticks(_yticks)
+    ax.set_yticklabels([f"{x:.1f}" for x in _yticks])
+
+    seaborn.lineplot(
+        data=df, ax=ax, x="size", y="perc_hamilton_found", hue="class", errorbar=('sd', 2),
+        style="class", markers=True, dashes=False)
+    ax.legend()
