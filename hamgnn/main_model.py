@@ -29,6 +29,12 @@ def train_main_model(variation_nr=None):
     return MAIN_MODEL_TRAIN_REQUEST.train(nr_cpu_threads=1, run_name=run_name)
 
 
+def test_main_model():
+    model = load_main_model()
+    results = model_utils.test_on_saved_data(model)
+    return results
+    
+
 def _yes_no_input(message):
     AFFIRMATIVE = ["yes", "y"]
     NEGATIVE = ["no", "n"]
