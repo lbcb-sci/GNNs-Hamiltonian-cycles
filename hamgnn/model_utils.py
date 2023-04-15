@@ -20,7 +20,7 @@ import hamgnn.nn_modules.hamilton_gnn_utils as gnn_utils
 def train_model(model_class, datamodule_class, model_checkpoint=None, model_hyperparams=None, datamodule_hyperparams=None,
                 trainer_hyperparams=None, train_parameters=None, model_checkpoint_hyperparams=None,
                 is_log_offline=False, wandb_project=constants.WEIGHTS_AND_BIASES_PROJECT, run_name=None, is_log_model=True,
-                is_run_test_at_the_end=True):
+                is_run_test_at_the_end=False):
     if model_hyperparams is None:
         model_hyperparams = {}
     if datamodule_hyperparams is None:
