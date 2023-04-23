@@ -181,7 +181,7 @@ class ModelTrainRequest:
     def __init__(self, **kwargs):
         self.arguments = kwargs
 
-    def train(self, nr_cpu_threads=16, run_name=None, is_run_test_at_the_end=True):
+    def train(self, nr_cpu_threads=16, run_name=None, is_run_test_at_the_end=False):
         torch.set_num_threads(nr_cpu_threads)
         extended_arguments = self.arguments.copy()
         if "run_name" not in self.arguments or self.arguments["run_name"] is None:
