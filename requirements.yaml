@@ -2,7 +2,7 @@ channels:
   - conda-forge
   - anaconda
   - pytorch
-  - defualts
+  - pyg
 
 dependencies:
   - python>=3.9
@@ -12,7 +12,8 @@ dependencies:
   - cudatoolkit==11.3.1
   - numpy>=1.21
   - pytorch-lightning==1.5.10
-  - pyg
+  - torchmetrics==0.9.3
+  - pyg==2.1.0
   - torchinfo
   - wandb
   - matplotlib
