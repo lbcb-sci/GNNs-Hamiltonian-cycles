@@ -16,7 +16,8 @@ import hamgnn.callbacks as my_callbacks
 
 train_request_HamS = model_utils.ModelTrainRequest(
     model_class = EncodeProcessDecodeAlgorithm,
-    datamodule_class = DataModules.ArtificialCycleWithDoubleEvaluationDataModule,
+    # datamodule_class = DataModules.ArtificialCycleWithDoubleEvaluationDataModule,
+    datamodule_class = DataModules.ArtificialCycleDataModule,
     model_checkpoint = None,
     model_hyperparams = {
         "processor_depth": 5,
