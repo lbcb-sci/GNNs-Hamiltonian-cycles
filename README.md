@@ -1,7 +1,7 @@
 ## Supplementary code for "Finding Hamiltonian cycles with Graph neural networks"
 
-Clone and run train.py to get the evaluation of "HamS" and "HamR" models presented in the paper. Running generate_figures.py will generate figures of Erdos-Renyi graphs similar to those presented in the paper.
-
+### Paper
+* the accompanying paper will be available soon ...
 
 ### Requirements:
 * [Python](https://www.python.org/) 3.8 or later
@@ -10,8 +10,17 @@ Clone and run train.py to get the evaluation of "HamS" and "HamR" models present
 * [Networkit](https://networkit.github.io/)
 * [Concorde TSP solver](http://www.math.uwaterloo.ca/tsp/concorde.html) (optional)
 
-### Paper
-* the accompanying paper will be available soon ...
+### Setup
+(Commands are supposed to be run from the root environment)
+* Use conda to create a new environemnt with
+```
+export ENV_NAME="hamgnn"
+conda env create --file requirements.yaml --name $ENV_NAME
+```
+* Then add this package in develop mode
+```
+pip install -e .
+```
 
 ### Main model training
 * Start the training with
@@ -22,7 +31,7 @@ This should log a wandb run and produce a checkpoint in `MODEL_CHECKPOINTS` dire
 
 ### Generate testing data with an exact solver
 * Install Concorde TSP solver from [https://www.math.uwaterloo.ca/tsp/concorde.html]
-* Update the following fields in `./config.cfg`:
+* Update the following fields in `./config.cfg` file:
     * CONCORDE_SCRIPT_PATH - path to "concorde" executable created during concorde install
 * Generate data for various experiments by running
 ```
