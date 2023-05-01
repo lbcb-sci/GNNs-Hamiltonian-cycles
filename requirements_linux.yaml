@@ -1,0 +1,21 @@
+channels:
+  - conda-forge
+  - anaconda
+  - pytorch
+  - pyg
+
+dependencies:
+  - python>=3.9
+  - pytorch==1.11.0
+  - torchaudio==0.11.0
+  - torchvision==0.12.0
+  - cudatoolkit==11.3.1
+  - numpy>=1.21
+  - pytorch-lightning==1.5.10
+  - torchmetrics==0.9.3
+  - pytorch_geometric==2.1.0
+  - torchinfo
+  - wandb
+  - matplotlib
+  - seaborn
+  - networkit
